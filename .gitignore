@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Environment (use .env; .env.example is the template)
+.env
+backend/.env
+
+# Build / output
+dist/
+build/
+*.tsbuildinfo
+
+# Data / DB
+backend/data/
+*.db
+*.db-journal
+
+# Logs
+*.log
+npm-debug.log*
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Optional
+.env.local
+.env.*.local

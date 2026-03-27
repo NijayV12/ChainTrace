@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #0f172a;
+  --card: #1e293b;
+  --border: #334155;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+  --accent: #14b8a6;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-slate-900 text-slate-100 antialiased;
+  font-family: "Outfit", system-ui, sans-serif;
+}
+
+.dark body {
+  @apply bg-slate-950;
+}
+
+/* Skeleton */
+.skeleton {
+  @apply animate-pulse rounded bg-slate-700/50;
+}

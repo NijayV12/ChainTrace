@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  phone        String?
+  passwordHash String   @map("password_hash")
+  role         String   @default("INVESTIGATOR")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  socialAccounts SocialAccount[]
+  activityLogs   ActivityLog[]
+  createdCases   Case[]        @relation("CreatedCases")
+  assignedCases  Case[]        @relation("AssignedCases")
+  investigatorReports InvestigatorReport[]
+  analystDecisions   AnalystDecision[]
+  caseNotes          CaseNote[]
+}
+
+model SocialAccount {
+  id                 String   @id @default(uuid())
+  userId             String   @map("user_id")
+  platform           String
+  handle             String
+  accountAge         Int      @map("account_age")
+  followers          Int      @default(0)
+  following          Int      @default(0)
+  posts              Int      @default(0)
+  profileComplete    Boolean  @default(false) @map("profile_complete")
+  verificationStatus String   @default("PENDING") @map("verification_status")
+  trustScore         Float?   @map("trust_score")
+  fakeTrustScore     Float?   @map("fake_trust_score")
+  fakeClassification String?  @map("fake_classification")
+  llmReason              String? @map("llm_reason")
+  llmFraudLikelihood     String? @map("llm_fraud_likelihood")
+  llmAdminRecommendation String? @map("llm_admin_recommendation")
+  blockchainHash         String?  @map("blockchain_hash")
+  similarAccountsDetected String? @map("similar_accounts_detected")
+  duplicateIdentityScore  Int?     @map("duplicate_identity_score")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alerts Alert[]
+  cases  CaseAccount[]
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  loginTime DateTime @map("login_time")
+  ipAddress String?  @map("ip_address")
+  device    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Alert {
+  id        String   @id @default(uuid())
+  accountId String   @map("account_id")
+  riskLevel String   @map("risk_level")
+  reason    String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  account SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+model Case {
+  id           String   @id @default(uuid())
+  title        String
+  description  String?
+  status       String   @default("OPEN")
+  createdById  String   @map("created_by_id")
+  assignedToId String?  @map("assigned_to_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  createdBy User @relation("CreatedCases", fields: [createdById], references: [id], onDelete: Cascade)
+  assignedTo User? @relation("AssignedCases", fields: [assignedToId], references: [id])
+
+  accounts CaseAccount[]
+  reports  InvestigatorReport[]
+  decisions AnalystDecision[]
+  notes    CaseNote[]
+}
+
+model CaseAccount {
+  caseId    String @map("case_id")
+  accountId String @map("account_id")
+
+  case    Case          @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  account SocialAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@id([caseId, accountId])
+}
+
+model InvestigatorReport {
+  id        String   @id @default(uuid())
+  caseId    String   @map("case_id")
+  authorId  String   @map("author_id")
+  summary   String
+  recommendation String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  case   Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+model AnalystDecision {
+  id         String   @id @default(uuid())
+  caseId     String   @map("case_id")
+  analystId  String   @map("analyst_id")
+  riskRating String   @map("risk_rating")
+  decision   String
+  rationale  String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  case    Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  analyst User @relation(fields: [analystId], references: [id], onDelete: Cascade)
+}
+
+model CaseNote {
+  id        String   @id @default(uuid())
+  caseId    String   @map("case_id")
+  authorId  String   @map("author_id")
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  case   Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
