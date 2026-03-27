@@ -20,7 +20,9 @@ export const config = {
     expiresIn: process.env.JWT_EXPIRES_IN ?? "7d",
   },
   database: {
-    url: process.env.DATABASE_URL ?? "file:./data/chaintrace.db",
+    url:
+      process.env.DATABASE_URL ??
+      "postgresql://postgres:postgres@localhost:5432/chaintrace?schema=public",
   },
   blockchain: {
     dataDir: process.env.BLOCKCHAIN_DATA_DIR ?? "./data/chain",

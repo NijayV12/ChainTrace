@@ -60,7 +60,7 @@ Frontend (selected files):
 - Node.js **>= 18**
 - npm
 
-No external database or message broker is required; Prisma uses **SQLite** and the blockchain uses a JSON file under `./data/chain`.
+No message broker is required; Prisma uses **Postgres** and the blockchain uses a JSON file under `./data/chain`.
 
 ---
 
@@ -86,6 +86,7 @@ Environment:
 
 - Copy `.env.example` to `.env` if you want to customize values.
 - Backend uses `backend/.env` for Prisma + runtime config.
+- For local development and production, set `DATABASE_URL` to a Postgres connection string.
 
 ---
 
@@ -121,7 +122,7 @@ Notes:
 
 - The frontend uses `VITE_API_URL` in production and falls back to the local Vite proxy in development.
 - Vercel SPA route rewrites are configured in `frontend/vercel.json`.
-- For production, prefer **Postgres** over SQLite. SQLite can be acceptable for a small demo, but Render disks are not the best long-term database strategy.
+- Create a **Render Postgres** database and use its connection string for `DATABASE_URL`.
 
 ---
 
