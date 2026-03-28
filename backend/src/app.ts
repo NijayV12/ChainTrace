@@ -8,6 +8,7 @@ import userRoutes from "./routes/userRoutes.js";
 import blockchainRoutes from "./routes/blockchainRoutes.js";
 import adminRoutes from "./admin/adminRoutes.js";
 import caseRoutes from "./routes/caseRoutes.js";
+import assistantRoutes from "./routes/assistantRoutes.js";
 
 const app = express();
 
@@ -38,6 +39,7 @@ app.use(`${config.apiPrefix}/users`, userRoutes);
 app.use(`${config.apiPrefix}/blockchain`, blockchainRoutes);
 app.use(`${config.apiPrefix}/admin`, adminRoutes);
 app.use(`${config.apiPrefix}/cases`, caseRoutes);
+app.use(`${config.apiPrefix}/assistant`, assistantRoutes);
 
 app.use(errorHandler);
 

@@ -1,3 +1,12 @@
+import type {
+  AccountSummary,
+  AdminActionLogEntry,
+  AdminRole,
+  AdminUserSummary,
+  CaseListItem,
+  ResultAccount,
+} from "../types/api";
+
 const API_BASE = (import.meta.env.VITE_API_URL ?? "").replace(/\/$/, "");
 const API = API_BASE ? `${API_BASE}/api/v1` : "/api/v1";
 
@@ -27,7 +36,7 @@ export const api = {
       request<{ user: unknown; token: string }>("/auth/login", { method: "POST", body: JSON.stringify(body) }),
   },
   cases: {
-    list: () => request<unknown[]>("/cases"),
+    list: () => request<CaseListItem[]>("/cases"),
     get: (id: string) => request<Record<string, unknown>>(`/cases/${id}`),
     create: (body: {
       title: string;
@@ -73,17 +82,70 @@ export const api = {
       request<Record<string, unknown>>(`/cases/${id}/export`),
   },
   users: {
-    getAccounts: () => request<Array<Record<string, unknown>>>("/users/accounts"),
+    getAccounts: () => request<AccountSummary[]>("/users/accounts"),
     verify: (body: Record<string, unknown>) =>
       request<Record<string, unknown>>("/users/verify", { method: "POST", body: JSON.stringify(body) }),
-    getResult: (id: string) => request<Record<string, unknown>>(`/users/accounts/${id}/result`),
+    getResult: (id: string) => request<ResultAccount>(`/users/accounts/${id}/result`),
   },
   blockchain: {
     explorer: () => request<{ length: number; blocks: unknown[]; valid: boolean }>("/blockchain/explorer"),
     blockByHash: (hash: string) => request<unknown>(`/blockchain/blocks/${hash}`),
   },
+  assistant: {
+    history: (params?: { caseId?: string }) => {
+      const q = new URLSearchParams();
+      if (params?.caseId) q.set("caseId", params.caseId);
+      const query = q.toString();
+      return request<{
+        conversationId: string;
+        contextLabel: string;
+        scope: "GLOBAL" | "CASE";
+        caseId: string | null;
+        messages: Array<{
+          id: string;
+          role: string;
+          content: string;
+          meta: string | null;
+          createdAt: string;
+        }>;
+      }>(`/assistant/history${query ? `?${query}` : ""}`);
+    },
+    chat: (body: { message: string; caseId?: string }) =>
+      request<{ reply: string; summary: string; contextLabel: string; conversationId: string }>("/assistant/chat", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+  },
   admin: {
     stats: () => request<Record<string, unknown>>("/admin/stats"),
+    users: () => request<AdminUserSummary[]>("/admin/users"),
+    auditLogs: () => request<AdminActionLogEntry[]>("/admin/audit-logs"),
+    createUser: (body: {
+      name: string;
+      email: string;
+      phone?: string;
+      password: string;
+      role: AdminRole;
+    }) =>
+      request<{ user: AdminUserSummary; token: string }>("/admin/users", {
+        method: "POST",
+        body: JSON.stringify(body),
+      }),
+    changeUserRole: (id: string, body: { role: AdminRole }) =>
+      request<AdminUserSummary>(`/admin/users/${id}/role`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    setUserStatus: (id: string, body: { isActive: boolean }) =>
+      request<AdminUserSummary>(`/admin/users/${id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
+    resetUserPassword: (id: string, body: { password: string }) =>
+      request<AdminUserSummary>(`/admin/users/${id}/password`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      }),
     accounts: (params?: { risk?: string; limit?: number }) => {
       const q = new URLSearchParams();
       if (params?.risk) q.set("risk", params.risk);

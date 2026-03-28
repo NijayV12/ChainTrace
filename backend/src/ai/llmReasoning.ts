@@ -27,7 +27,10 @@ export async function getLLMReasoning(params: {
   if (!config.llm.reasoningEnabled || !config.llm.apiKey) {
     return null;
   }
-  const openai = new OpenAI({ apiKey: config.llm.apiKey });
+  const openai = new OpenAI({
+    apiKey: config.llm.apiKey,
+    baseURL: config.llm.baseUrl,
+  });
   const prompt = `You are a fraud analyst. Based on the following verified metrics (the trust score is already computed and must NOT be changed), provide a short analysis.
 
 Platform: ${params.platform}
@@ -44,7 +47,7 @@ Respond in JSON only with exactly these keys (short 1-2 sentence each):
 
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: config.llm.model,
       messages: [{ role: "user", content: prompt }],
       response_format: { type: "json_object" },
     });

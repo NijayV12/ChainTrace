@@ -2,20 +2,10 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
-
-interface CaseItem {
-  id: string;
-  title: string;
-  status: string;
-  createdAt: string;
-  updatedAt: string;
-  createdBy?: { name: string; email: string };
-  assignedTo?: { name: string; email: string } | null;
-  accounts?: { account: { platform: string; handle: string; fakeClassification?: string | null } }[];
-}
+import type { CaseListItem } from "../types/api";
 
 export default function CasesList() {
-  const [items, setItems] = useState<CaseItem[]>([]);
+  const [items, setItems] = useState<CaseListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { user } = useAuth();
@@ -26,7 +16,7 @@ export default function CasesList() {
       try {
         const data = await api.cases.list();
         if (!active) return;
-        setItems(data as CaseItem[]);
+        setItems(data);
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : "Failed to load cases");
@@ -110,13 +100,13 @@ export default function CasesList() {
                       </span>
                     </td>
                     <td className="px-4 py-2 text-xs text-slate-300">
-                      {c.createdBy?.name ?? "—"}
+                      {c.createdBy?.name ?? "-"}
                     </td>
                     <td className="px-4 py-2 text-xs text-slate-300">
                       {c.assignedTo?.name ?? "Unassigned"}
                     </td>
                     <td className="px-4 py-2 text-xs text-slate-300">
-                      {c.accounts?.length ?? 0} ·{" "}
+                      {c.accounts?.length ?? 0} |{" "}
                       <span className="text-[11px] text-slate-400">highest: {highest}</span>
                     </td>
                     <td className="px-4 py-2 text-xs text-slate-400">
@@ -132,4 +122,3 @@ export default function CasesList() {
     </div>
   );
 }
-

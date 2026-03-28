@@ -54,6 +54,13 @@ export async function login(
     throw err;
   };
   if (!user) return badCreds();
+  if (!user.isActive) {
+    const err = new Error("This account is inactive. Contact a super admin.") as Error & {
+      statusCode?: number;
+    };
+    err.statusCode = 403;
+    throw err;
+  }
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) return badCreds();
   await prisma.activityLog.create({

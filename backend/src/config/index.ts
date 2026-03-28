@@ -28,7 +28,13 @@ export const config = {
     dataDir: process.env.BLOCKCHAIN_DATA_DIR ?? "./data/chain",
   },
   llm: {
-    apiKey: process.env.OPENAI_API_KEY ?? "",
+    apiKey:
+      process.env.LLM_API_KEY ??
+      process.env.GROQ_API_KEY ??
+      process.env.OPENAI_API_KEY ??
+      "",
+    baseUrl: process.env.LLM_BASE_URL ?? "https://api.openai.com/v1",
+    model: process.env.LLM_MODEL ?? "gpt-4o-mini",
     reasoningEnabled: process.env.LLM_REASONING_ENABLED === "true",
   },
   log: {

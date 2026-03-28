@@ -3,19 +3,10 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { api } from "../api/client";
 import { TrustScoreChart } from "../components/TrustScoreChart";
-
-interface Account {
-  id: string;
-  platform: string;
-  handle: string;
-  verificationStatus: string;
-  trustScore: number | null;
-  fakeTrustScore?: number | null;
-  createdAt: string;
-}
+import type { AccountSummary } from "../types/api";
 
 export default function UserDashboard() {
-  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accounts, setAccounts] = useState<AccountSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,7 +17,7 @@ export default function UserDashboard() {
         const data = await api.users.getAccounts();
         if (!active) return;
         setAccounts(
-          (data as unknown as Account[]).sort(
+          data.sort(
             (a, b) =>
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           )
@@ -63,10 +54,7 @@ export default function UserDashboard() {
     <div className="space-y-6 animate-fade-in">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-semibold text-white">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-teal-500/15 text-base">
-              📊
-            </span>
+          <h1 className="text-2xl font-semibold text-white">
             Identity Trust Dashboard
           </h1>
           <p className="mt-1 text-sm text-slate-400">
@@ -131,110 +119,113 @@ export default function UserDashboard() {
             Verified identities are hashed and anchored to a lightweight
             blockchain for tamper-evident audit trails.
           </p>
+          <p className="mt-3 text-xs text-slate-500">
+            Stored scores are deterministic. Any AI explanation shown elsewhere is advisory and never changes the saved score.
+          </p>
         </motion.div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-[2fr,1.3fr]">
         <div className="rounded-xl border border-slate-700/60 bg-slate-900/80">
-        <div className="flex items-center justify-between border-b border-slate-700/60 px-4 py-3">
-          <h2 className="text-sm font-medium text-slate-200">
-            Verified Social Accounts
-          </h2>
-          <span className="text-xs text-slate-500">
-            {accounts.length} account{accounts.length === 1 ? "" : "s"}
-          </span>
-        </div>
-        {error && (
-          <div className="border-b border-rose-500/40 bg-rose-950/40 px-4 py-2 text-xs text-rose-200">
-            {error}
+          <div className="flex items-center justify-between border-b border-slate-700/60 px-4 py-3">
+            <h2 className="text-sm font-medium text-slate-200">
+              Verified Social Accounts
+            </h2>
+            <span className="text-xs text-slate-500">
+              {accounts.length} account{accounts.length === 1 ? "" : "s"}
+            </span>
           </div>
-        )}
+          {error && (
+            <div className="border-b border-rose-500/40 bg-rose-950/40 px-4 py-2 text-xs text-rose-200">
+              {error}
+            </div>
+          )}
           <div className="max-h-[420px] overflow-auto text-sm">
-          <table className="min-w-full border-separate border-spacing-y-1 px-2">
-            <thead className="text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-2 text-left font-medium">Account</th>
-                <th className="px-4 py-2 text-left font-medium">Status</th>
-                <th className="px-4 py-2 text-left font-medium">Trust Score</th>
-                <th className="px-4 py-2 text-left font-medium">Created</th>
-                <th className="px-4 py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                Array.from({ length: 4 }).map((_, i) => (
-                  <tr key={i}>
-                    <td className="px-4 py-3">
-                      <div className="skeleton h-4 w-32" />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="skeleton h-4 w-20" />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="skeleton h-4 w-16" />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="skeleton h-4 w-24" />
-                    </td>
-                    <td className="px-4 py-3" />
-                  </tr>
-                ))
-              ) : accounts.length === 0 ? (
+            <table className="min-w-full border-separate border-spacing-y-1 px-2">
+              <thead className="text-xs uppercase tracking-wide text-slate-500">
                 <tr>
-                  <td
-                    colSpan={5}
-                    className="px-4 py-6 text-center text-sm text-slate-500"
-                  >
-                    No accounts yet.{" "}
-                    <Link
-                      to="/verify"
-                      className="text-teal-400 underline-offset-2 hover:underline"
-                    >
-                      Submit your first verification.
-                    </Link>
-                  </td>
+                  <th className="px-4 py-2 text-left font-medium">Account</th>
+                  <th className="px-4 py-2 text-left font-medium">Status</th>
+                  <th className="px-4 py-2 text-left font-medium">Trust Score</th>
+                  <th className="px-4 py-2 text-left font-medium">Created</th>
+                  <th className="px-4 py-2" />
                 </tr>
-              ) : (
-                accounts.map((acc) => (
-                  <tr key={acc.id}>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-slate-200">
-                        {acc.platform}
-                      </div>
-                      <div className="text-xs text-slate-400">@{acc.handle}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-full px-2.5 py-1 text-[11px] ${classificationColor(
-                          acc.trustScore
-                        )}`}
-                      >
-                        {classificationLabel(acc.trustScore)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 align-middle text-slate-200">
-                      {acc.trustScore != null ? (
-                        <span>{acc.trustScore.toFixed(2)}</span>
-                      ) : (
-                        <span className="text-slate-500">Pending</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-slate-400">
-                      {new Date(acc.createdAt).toLocaleString()}
-                    </td>
-                    <td className="px-4 py-3 text-right">
+              </thead>
+              <tbody>
+                {loading ? (
+                  Array.from({ length: 4 }).map((_, i) => (
+                    <tr key={i}>
+                      <td className="px-4 py-3">
+                        <div className="skeleton h-4 w-32" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="skeleton h-4 w-20" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="skeleton h-4 w-16" />
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="skeleton h-4 w-24" />
+                      </td>
+                      <td className="px-4 py-3" />
+                    </tr>
+                  ))
+                ) : accounts.length === 0 ? (
+                  <tr>
+                    <td
+                      colSpan={5}
+                      className="px-4 py-6 text-center text-sm text-slate-500"
+                    >
+                      No accounts yet.{" "}
                       <Link
-                        to={`/accounts/${acc.id}/result`}
-                        className="text-xs text-teal-400 hover:underline"
+                        to="/verify"
+                        className="text-teal-400 underline-offset-2 hover:underline"
                       >
-                        View details
+                        Submit your first verification.
                       </Link>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ) : (
+                  accounts.map((acc) => (
+                    <tr key={acc.id}>
+                      <td className="px-4 py-3">
+                        <div className="font-medium text-slate-200">
+                          {acc.platform}
+                        </div>
+                        <div className="text-xs text-slate-400">@{acc.handle}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex rounded-full px-2.5 py-1 text-[11px] ${classificationColor(
+                            acc.trustScore
+                          )}`}
+                        >
+                          {classificationLabel(acc.trustScore)}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 align-middle text-slate-200">
+                        {acc.trustScore != null ? (
+                          <span>{acc.trustScore.toFixed(2)}</span>
+                        ) : (
+                          <span className="text-slate-500">Pending</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-400">
+                        {new Date(acc.createdAt).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Link
+                          to={`/accounts/${acc.id}/result`}
+                          className="text-xs text-teal-400 hover:underline"
+                        >
+                          View details
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
         <div className="h-full">
@@ -249,4 +240,3 @@ export default function UserDashboard() {
     </div>
   );
 }
-

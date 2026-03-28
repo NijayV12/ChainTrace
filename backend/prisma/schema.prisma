@@ -14,7 +14,9 @@ model User {
   phone        String?
   passwordHash String   @map("password_hash")
   role         String   @default("INVESTIGATOR")
+  isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   socialAccounts SocialAccount[]
   activityLogs   ActivityLog[]
@@ -23,6 +25,9 @@ model User {
   investigatorReports InvestigatorReport[]
   analystDecisions   AnalystDecision[]
   caseNotes          CaseNote[]
+  adminActionsByActor  AdminActionLog[] @relation("AdminActionActor")
+  adminActionsOnTarget AdminActionLog[] @relation("AdminActionTarget")
+  assistantConversations AssistantConversation[]
 }
 
 model SocialAccount {
@@ -91,6 +96,7 @@ model Case {
   reports  InvestigatorReport[]
   decisions AnalystDecision[]
   notes    CaseNote[]
+  assistantConversations AssistantConversation[]
 }
 
 model CaseAccount {
@@ -137,4 +143,44 @@ model CaseNote {
 
   case   Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
   author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+}
+
+model AdminActionLog {
+  id          String   @id @default(uuid())
+  actorId     String   @map("actor_id")
+  targetUserId String  @map("target_user_id")
+  action      String
+  metadata    String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  actor      User @relation("AdminActionActor", fields: [actorId], references: [id], onDelete: Cascade)
+  targetUser User @relation("AdminActionTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+}
+
+model AssistantConversation {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  caseId    String?  @map("case_id")
+  contextKey String  @map("context_key")
+  scope     String   @default("GLOBAL")
+  label     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  case     Case?             @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  messages AssistantMessage[]
+
+  @@unique([userId, contextKey])
+}
+
+model AssistantMessage {
+  id             String   @id @default(uuid())
+  conversationId String   @map("conversation_id")
+  role           String
+  content        String
+  meta           String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation AssistantConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 }

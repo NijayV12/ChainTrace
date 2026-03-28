@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import AssistantPanel from "../components/AssistantPanel";
 
 interface Stats {
   users: number;
@@ -371,6 +372,8 @@ export default function AdminDashboard() {
           </div>
         </section>
       )}
+
+      <AssistantPanel />
     </div>
   );
 }
