@@ -11,6 +11,7 @@ async function main() {
     update: {
       // Ensure existing admin user is promoted to SUPER_ADMIN
       role: "SUPER_ADMIN",
+      isActive: true,
       passwordHash: hash,
     },
     create: {
@@ -18,6 +19,7 @@ async function main() {
       email: "admin@chaintrace.io",
       passwordHash: hash,
       role: "SUPER_ADMIN",
+      isActive: true,
     },
   });
 
@@ -25,6 +27,7 @@ async function main() {
     where: { email: "investigator@demo.com" },
     update: {
       role: "INVESTIGATOR",
+      isActive: true,
       passwordHash: hash,
     },
     create: {
@@ -33,6 +36,7 @@ async function main() {
       phone: "+1234567890",
       passwordHash: hash,
       role: "INVESTIGATOR",
+      isActive: true,
     },
   });
 
@@ -40,6 +44,7 @@ async function main() {
     where: { email: "analyst@demo.com" },
     update: {
       role: "ANALYST",
+      isActive: true,
       passwordHash: hash,
     },
     create: {
@@ -48,6 +53,7 @@ async function main() {
       phone: "+1234567890",
       passwordHash: hash,
       role: "ANALYST",
+      isActive: true,
     },
   });
 

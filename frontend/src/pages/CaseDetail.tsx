@@ -82,6 +82,10 @@ function scoreLabel(score: number | null): string {
   return "High concern";
 }
 
+function formatDate(value: string) {
+  return new Date(value).toLocaleString();
+}
+
 export default function CaseDetail() {
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<CaseData | null>(null);
@@ -229,6 +233,68 @@ export default function CaseDetail() {
     }
   };
 
+  const handleExportBrief = () => {
+    if (!data) return;
+
+    const lines = [
+      "CHAINTRACE CASE BRIEF",
+      "",
+      `Case Title: ${data.title}`,
+      `Case ID: ${data.id}`,
+      `Status: ${data.status}`,
+      `Created: ${formatDate(data.createdAt)}`,
+      `Updated: ${formatDate(data.updatedAt)}`,
+      `Created By: ${data.createdBy?.name ?? "Unknown"} (${data.createdBy?.email ?? "n/a"})`,
+      `Assigned To: ${data.assignedTo?.name ?? "Unassigned"} (${data.assignedTo?.email ?? "n/a"})`,
+      "",
+      "Description",
+      data.description ?? "No description provided.",
+      "",
+      "Linked Accounts",
+      ...(data.accounts.length
+        ? data.accounts.map(
+            ({ account }) =>
+              `- ${account.platform} @${account.handle} | base ${account.trustScore ?? "n/a"} | fake ${
+                account.fakeTrustScore ?? "n/a"
+              } | classification ${account.fakeClassification ?? "PENDING"} | blockchain ${
+                account.blockchainHash ?? "not anchored"
+              }`
+          )
+        : ["- No linked accounts"]),
+      "",
+      "Investigator Reports",
+      ...(data.reports?.length
+        ? data.reports.map(
+            (report) =>
+              `- ${report.author?.name ?? "Unknown"} on ${formatDate(report.createdAt)} | ${report.summary} | recommendation: ${report.recommendation}`
+          )
+        : ["- No investigator reports saved"]),
+      "",
+      "Analyst Decisions",
+      ...(data.decisions?.length
+        ? data.decisions.map(
+            (decision) =>
+              `- ${decision.analyst?.name ?? "Unknown"} on ${formatDate(decision.createdAt)} | ${decision.riskRating} | ${decision.decision} | rationale: ${decision.rationale}`
+          )
+        : ["- No analyst decisions saved"]),
+      "",
+      "Case Notes",
+      ...(data.notes?.length
+        ? data.notes.map(
+            (note) => `- ${note.author?.name ?? "Unknown"} on ${formatDate(note.createdAt)} | ${note.body}`
+          )
+        : ["- No notes recorded"]),
+    ];
+
+    const blob = new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `case-${data.id}-brief.txt`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -296,6 +362,13 @@ export default function CaseDetail() {
               className="rounded-xl bg-teal-400 px-4 py-2 text-sm font-medium text-slate-950 hover:bg-teal-300"
             >
               Export case bundle
+            </button>
+            <button
+              type="button"
+              onClick={handleExportBrief}
+              className="rounded-xl border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-900"
+            >
+              Export case brief
             </button>
           </div>
         </div>

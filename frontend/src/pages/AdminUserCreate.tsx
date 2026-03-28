@@ -57,6 +57,9 @@ export default function AdminUserCreate() {
   const [roleDrafts, setRoleDrafts] = useState<Record<string, AdminRole>>({});
   const [passwordDrafts, setPasswordDrafts] = useState<Record<string, string>>({});
   const [busyUserId, setBusyUserId] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
+  const [auditFilter, setAuditFilter] = useState("");
 
   const userCount = users.length;
   const activeCount = users.filter((entry) => entry.isActive).length;
@@ -71,6 +74,40 @@ export default function AdminUserCreate() {
       }),
     [users]
   );
+
+  const filteredUsers = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return sortedUsers.filter((entry) => {
+      const matchesQuery =
+        !query ||
+        entry.name.toLowerCase().includes(query) ||
+        entry.email.toLowerCase().includes(query) ||
+        (entry.phone ?? "").toLowerCase().includes(query);
+      const matchesStatus =
+        statusFilter === "ALL" ||
+        (statusFilter === "ACTIVE" && entry.isActive) ||
+        (statusFilter === "INACTIVE" && !entry.isActive);
+      return matchesQuery && matchesStatus;
+    });
+  }, [search, sortedUsers, statusFilter]);
+
+  const filteredAuditLogs = useMemo(() => {
+    const query = auditFilter.trim().toLowerCase();
+    if (!query) return auditLogs;
+    return auditLogs.filter((entry) =>
+      [
+        entry.action,
+        entry.actor.name,
+        entry.actor.email,
+        entry.targetUser.name,
+        entry.targetUser.email,
+        parseAuditMetadata(entry.metadata),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query)
+    );
+  }, [auditFilter, auditLogs]);
 
   const loadAdminData = async () => {
     setLoading(true);
@@ -319,6 +356,13 @@ export default function AdminUserCreate() {
             </button>
           </div>
 
+          <input
+            value={auditFilter}
+            onChange={(event) => setAuditFilter(event.target.value)}
+            className="mt-4 w-full rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm text-white focus:border-teal-400 focus:outline-none"
+            placeholder="Filter by action, actor, or target"
+          />
+
           <div className="mt-5 space-y-3">
             {loading ? (
               <>
@@ -326,12 +370,12 @@ export default function AdminUserCreate() {
                 <div className="skeleton h-16 w-full" />
                 <div className="skeleton h-16 w-full" />
               </>
-            ) : auditLogs.length === 0 ? (
+            ) : filteredAuditLogs.length === 0 ? (
               <div className="rounded-2xl border border-slate-800 bg-slate-900/35 p-5 text-sm text-slate-400">
-                No admin activity recorded yet.
+                No matching admin activity found.
               </div>
             ) : (
-              auditLogs.slice(0, 8).map((entry) => (
+              filteredAuditLogs.slice(0, 8).map((entry) => (
                 <div key={entry.id} className="rounded-2xl border border-slate-800 bg-slate-900/40 p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div>
@@ -365,6 +409,23 @@ export default function AdminUserCreate() {
               super admin account remains protected from self-lockout actions.
             </p>
           </div>
+          <div className="grid gap-3 sm:grid-cols-[240px,160px]">
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm text-white focus:border-teal-400 focus:outline-none"
+              placeholder="Search name, email, or phone"
+            />
+            <select
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as "ALL" | "ACTIVE" | "INACTIVE")}
+              className="rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm text-white focus:border-teal-400 focus:outline-none"
+            >
+              <option value="ALL">All statuses</option>
+              <option value="ACTIVE">Active only</option>
+              <option value="INACTIVE">Inactive only</option>
+            </select>
+          </div>
         </div>
 
         <div className="mt-6 space-y-4">
@@ -374,12 +435,12 @@ export default function AdminUserCreate() {
               <div className="skeleton h-28 w-full" />
               <div className="skeleton h-28 w-full" />
             </>
-          ) : sortedUsers.length === 0 ? (
+          ) : filteredUsers.length === 0 ? (
             <div className="rounded-2xl border border-slate-800 bg-slate-900/35 p-5 text-sm text-slate-400">
-              No users found yet.
+              No users match the current search or status filter.
             </div>
           ) : (
-            sortedUsers.map((entry) => {
+            filteredUsers.map((entry) => {
               const isCurrentUser = currentUser?.id === entry.id;
               const isBusy = busyUserId === entry.id;
 

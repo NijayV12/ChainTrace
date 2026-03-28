@@ -1,6 +1,7 @@
-import OpenAI from "openai";
 import { config } from "../config/index.js";
 import { prisma } from "../database/client.js";
+import { ANALYST_ASSISTANT_SYSTEM_PROMPT, buildAssistantPrompt } from "./prompts.js";
+import { createLLMClient, isLLMEnabled } from "./llmClient.js";
 
 const MAX_HISTORY_MESSAGES = 12;
 
@@ -250,7 +251,7 @@ export async function generateAssistantReply(params: {
     },
   });
 
-  if (!config.llm.reasoningEnabled || !config.llm.apiKey) {
+  if (!isLLMEnabled()) {
     const fallback = {
       reply:
         "LLM assistance is disabled right now. Enable `LLM_REASONING_ENABLED=true` and provide `LLM_API_KEY` or another supported provider key to use the analyst assistant.",
@@ -272,19 +273,7 @@ export async function generateAssistantReply(params: {
     return fallback;
   }
 
-  const openai = new OpenAI({
-    apiKey: config.llm.apiKey,
-    baseURL: config.llm.baseUrl,
-  });
-
-  const systemPrompt = `You are ChainTrace Analyst Assistant, a careful fraud-review aide for internal investigators, analysts, and super admins.
-You must never claim to change trust scores, overwrite deterministic outputs, or approve final enforcement decisions.
-You may summarize risk, suggest next investigative actions, explain likely concerns, summarize a case, and point out what to review next.
-If a case context is provided, ground the answer in that case first.
-Be concise, operational, and professional.
-Reply in JSON with exactly these keys:
-- reply: 2-6 sentence answer to the user
-- summary: one short line summarizing the recommendation`;
+  const openai = createLLMClient();
 
   const caseSection = caseContext
     ? `Case context:
@@ -339,50 +328,43 @@ ${caseContext.notes.length
         .join("\n")
     : "No prior conversation in this scope.";
 
-  const prompt = `User role: ${params.role}
-Conversation scope: ${params.caseId ? "CASE" : "GLOBAL"}
-User question: ${params.message}
-
-Prior conversation:
-${historySection}
-
-Recent alerts:
-${recentAlerts
-  .map(
-    (alert) =>
-      `- ${alert.riskLevel}: ${alert.account?.platform ?? "unknown"} @${
-        alert.account?.handle ?? "unknown"
-      } | classification ${alert.account?.fakeClassification ?? "n/a"} | fake score ${
-        alert.account?.fakeTrustScore ?? "n/a"
-      } | reason ${alert.reason}`
-  )
-  .join("\n")}
-
-Recent cases:
-${recentCases
-  .map(
-    (caseItem) =>
-      `- ${caseItem.title} (${caseItem.status}) with ${caseItem.accounts.length} linked account(s)`
-  )
-  .join("\n")}
-
-Recent accounts:
-${latestAccounts
-  .map(
-    (account) =>
-      `- ${account.platform} @${account.handle} | base ${account.trustScore ?? "n/a"} | fake ${
-        account.fakeTrustScore ?? "n/a"
-      } | classification ${account.fakeClassification ?? "n/a"}`
-  )
-  .join("\n")}
-
-${caseSection}`;
+  const prompt = buildAssistantPrompt({
+    role: params.role,
+    scope: params.caseId ? "CASE" : "GLOBAL",
+    userQuestion: params.message,
+    historySection,
+    alertsSection: recentAlerts
+      .map(
+        (alert) =>
+          `- ${alert.riskLevel}: ${alert.account?.platform ?? "unknown"} @${
+            alert.account?.handle ?? "unknown"
+          } | classification ${alert.account?.fakeClassification ?? "n/a"} | fake score ${
+            alert.account?.fakeTrustScore ?? "n/a"
+          } | reason ${alert.reason}`
+      )
+      .join("\n"),
+    casesSection: recentCases
+      .map(
+        (caseItem) =>
+          `- ${caseItem.title} (${caseItem.status}) with ${caseItem.accounts.length} linked account(s)`
+      )
+      .join("\n"),
+    accountsSection: latestAccounts
+      .map(
+        (account) =>
+          `- ${account.platform} @${account.handle} | base ${account.trustScore ?? "n/a"} | fake ${
+            account.fakeTrustScore ?? "n/a"
+          } | classification ${account.fakeClassification ?? "n/a"}`
+      )
+      .join("\n"),
+    caseSection,
+  });
 
   try {
     const completion = await openai.chat.completions.create({
       model: config.llm.model,
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: ANALYST_ASSISTANT_SYSTEM_PROMPT },
         { role: "user", content: prompt },
       ],
       response_format: { type: "json_object" },

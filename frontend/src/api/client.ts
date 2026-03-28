@@ -24,7 +24,17 @@ export async function request<T>(
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
-  const res = await fetch(`${API}${path}`, { ...options, headers });
+  let res: Response;
+  try {
+    res = await fetch(`${API}${path}`, { ...options, headers });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new Error(
+        "Network request failed. Check that the API is deployed, the frontend API URL is correct, and CORS is configured for this site."
+      );
+    }
+    throw error;
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error ?? res.statusText);
   return data as T;

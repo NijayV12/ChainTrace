@@ -25,11 +25,16 @@ function shortHash(value: string, start = 12, end = 10): string {
   return `${value.slice(0, start)}...${value.slice(-end)}`;
 }
 
+function formatDate(value: number) {
+  return new Date(value).toLocaleString();
+}
+
 export default function BlockchainExplorer() {
   const [data, setData] = useState<ExplorerData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedHash, setSelectedHash] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -52,13 +57,23 @@ export default function BlockchainExplorer() {
     };
   }, []);
 
-  const blocksNewestFirst = useMemo(
-    () => (data?.blocks ? [...data.blocks].reverse() : []),
-    [data]
-  );
+  const blocksNewestFirst = useMemo(() => (data?.blocks ? [...data.blocks].reverse() : []), [data]);
 
-  const selectedBlock =
-    blocksNewestFirst.find((block) => block.hash === selectedHash) ?? blocksNewestFirst[0];
+  const visibleBlocks = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return blocksNewestFirst;
+    return blocksNewestFirst.filter(
+      (block) =>
+        String(block.index).includes(needle) ||
+        block.hash.toLowerCase().includes(needle) ||
+        block.previousHash.toLowerCase().includes(needle) ||
+        block.dataHash.toLowerCase().includes(needle) ||
+        block.data.identityHash.toLowerCase().includes(needle) ||
+        (block.data.accountId ?? "").toLowerCase().includes(needle)
+    );
+  }, [blocksNewestFirst, query]);
+
+  const selectedBlock = visibleBlocks.find((block) => block.hash === selectedHash) ?? visibleBlocks[0];
 
   const overview = useMemo(() => {
     const blocks = data?.blocks ?? [];
@@ -82,8 +97,8 @@ export default function BlockchainExplorer() {
           <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500">Blockchain explorer</p>
           <h1 className="mt-3 text-3xl font-semibold text-white">Trace how verification anchors move through the chain.</h1>
           <p className="mt-3 max-w-3xl text-sm text-slate-400">
-            This view is designed for audit and review. Each block records a hashed identity anchor
-            so the team can prove that verification events were written into a tamper-evident sequence.
+            This view is built for audit and review. Each block records a hashed identity anchor so the
+            team can demonstrate that verification events were written into a tamper-evident sequence.
           </p>
         </div>
 
@@ -134,28 +149,33 @@ export default function BlockchainExplorer() {
               {loading
                 ? "Loading blocks..."
                 : `From ${
-                    overview.firstTimestamp
-                      ? new Date(overview.firstTimestamp).toLocaleDateString()
-                      : "n/a"
+                    overview.firstTimestamp ? new Date(overview.firstTimestamp).toLocaleDateString() : "n/a"
                   } to ${
-                    overview.latestTimestamp
-                      ? new Date(overview.latestTimestamp).toLocaleDateString()
-                      : "n/a"
+                    overview.latestTimestamp ? new Date(overview.latestTimestamp).toLocaleDateString() : "n/a"
                   }`}
             </p>
           </div>
 
           <div className="mt-6 space-y-3">
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              className="w-full rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm text-white focus:border-teal-400 focus:outline-none"
+              placeholder="Search by block number, hash, identity hash, or account ID"
+            />
+
             {loading ? (
               <>
                 <div className="skeleton h-20 w-full rounded-[1.5rem]" />
                 <div className="skeleton h-20 w-full rounded-[1.5rem]" />
                 <div className="skeleton h-20 w-full rounded-[1.5rem]" />
               </>
-            ) : !blocksNewestFirst.length ? (
-              <p className="text-sm text-slate-500">No blocks found.</p>
+            ) : !visibleBlocks.length ? (
+              <p className="text-sm text-slate-500">
+                {query ? "No blocks match the current search." : "No blocks found."}
+              </p>
             ) : (
-              blocksNewestFirst.map((block, index) => (
+              visibleBlocks.map((block, index) => (
                 <button
                   key={block.hash}
                   type="button"
@@ -171,15 +191,15 @@ export default function BlockchainExplorer() {
                       <p className="text-sm font-medium text-white">
                         Block #{block.index} {index === 0 ? "• Latest" : ""}
                       </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {new Date(block.timestamp).toLocaleString()}
-                      </p>
+                      <p className="mt-1 text-xs text-slate-500">{formatDate(block.timestamp)}</p>
                     </div>
-                    <span className={`rounded-full border px-3 py-1 text-[11px] ${
-                      block.index === 0
-                        ? "border-sky-400/20 bg-sky-400/10 text-sky-200"
-                        : "border-slate-700 bg-slate-900/50 text-slate-400"
-                    }`}>
+                    <span
+                      className={`rounded-full border px-3 py-1 text-[11px] ${
+                        block.index === 0
+                          ? "border-sky-400/20 bg-sky-400/10 text-sky-200"
+                          : "border-slate-700 bg-slate-900/50 text-slate-400"
+                      }`}
+                    >
                       nonce {block.nonce}
                     </span>
                   </div>
@@ -212,7 +232,7 @@ export default function BlockchainExplorer() {
               <div className="grid gap-4 md:grid-cols-3">
                 <div className="rounded-[1.5rem] border border-slate-800 bg-slate-900/35 p-5">
                   <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Timestamp</p>
-                  <p className="mt-3 text-sm text-white">{new Date(selectedBlock.timestamp).toLocaleString()}</p>
+                  <p className="mt-3 text-sm text-white">{formatDate(selectedBlock.timestamp)}</p>
                 </div>
                 <div className="rounded-[1.5rem] border border-slate-800 bg-slate-900/35 p-5">
                   <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Nonce</p>
@@ -244,7 +264,7 @@ export default function BlockchainExplorer() {
                 <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Audit interpretation</p>
                 <ul className="mt-4 space-y-3 text-sm text-slate-300">
                   <li>This block anchors a verification event using a hashed identity value rather than raw personal data.</li>
-                  <li>The previous hash links this record to the chain history, making silent tampering easier to detect.</li>
+                  <li>The previous hash links this record to chain history, making silent tampering easier to detect.</li>
                   <li>The nonce shows the proof-of-work effort required before the block was accepted.</li>
                 </ul>
               </div>
