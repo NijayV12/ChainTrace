@@ -72,6 +72,7 @@ export default function CasesList() {
                 <th className="px-4 py-2 text-left">Assigned</th>
                 <th className="px-4 py-2 text-left">Accounts</th>
                 <th className="px-4 py-2 text-left">Updated</th>
+                <th className="px-4 py-2 text-left">Evidence</th>
               </tr>
             </thead>
             <tbody>
@@ -111,6 +112,14 @@ export default function CasesList() {
                     </td>
                     <td className="px-4 py-2 text-xs text-slate-400">
                       {new Date(c.updatedAt || c.createdAt).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2 text-xs">
+                      <Link
+                        to={`/cases/${c.id}/network`}
+                        className="text-sky-300 hover:underline"
+                      >
+                        View network
+                      </Link>
                     </td>
                   </tr>
                 );

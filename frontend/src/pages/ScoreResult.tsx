@@ -45,7 +45,7 @@ export default function ScoreResult() {
             Trust Score Result
           </h1>
           <p className="mt-1 text-sm text-slate-400">
-            Deterministic AI scoring based on your supplied account metrics.
+            Hybrid scoring that combines deterministic trust, fake-engine signals, and ML fraud inference.
           </p>
         </div>
         <Link
@@ -84,10 +84,10 @@ export default function ScoreResult() {
               <div className="space-y-1 text-right">
                 <span
                   className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${classificationColor(
-                    data.fakeClassification ?? data.classification
+                    data.fusedClassification ?? data.fakeClassification ?? data.classification
                   )}`}
                 >
-                  {data.fakeClassification ?? data.classification}
+                  {data.fusedClassification ?? data.fakeClassification ?? data.classification}
                 </span>
                 {data.fakeTrustScore != null && (
                   <p className="text-[11px] text-slate-500">
@@ -138,6 +138,47 @@ export default function ScoreResult() {
                 </div>
               </div>
             </div>
+
+            <div className="mt-6 grid gap-3 md:grid-cols-3">
+              <div className="rounded-xl border border-slate-700/60 bg-slate-950/40 p-4">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Fused Trust</p>
+                <p className="mt-2 text-2xl font-semibold text-white">
+                  {data.fusedTrustScore != null ? data.fusedTrustScore.toFixed(2) : "--"}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">{data.fusedClassification ?? "Pending"}</p>
+              </div>
+              <div className="rounded-xl border border-slate-700/60 bg-slate-950/40 p-4">
+                <p className="text-xs uppercase tracking-wide text-slate-500">ML Fraud Probability</p>
+                <p className="mt-2 text-2xl font-semibold text-white">
+                  {data.mlFraudProbability != null ? `${(data.mlFraudProbability * 100).toFixed(1)}%` : "--"}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">{data.mlRiskBand ?? "Model pending"}</p>
+              </div>
+              <div className="rounded-xl border border-slate-700/60 bg-slate-950/40 p-4">
+                <p className="text-xs uppercase tracking-wide text-slate-500">ML Confidence</p>
+                <p className="mt-2 text-2xl font-semibold text-white">
+                  {data.mlConfidence != null ? `${(data.mlConfidence * 100).toFixed(1)}%` : "--"}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">Model certainty</p>
+              </div>
+            </div>
+
+            <div className="mt-3 rounded-xl border border-slate-700/60 bg-slate-950/40 p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Anomaly Score</p>
+                  <p className="mt-2 text-2xl font-semibold text-white">
+                    {data.anomalyScore != null ? `${(data.anomalyScore * 100).toFixed(1)}%` : "--"}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs uppercase tracking-wide text-slate-500">Anomaly Band</p>
+                  <p className="mt-2 text-sm font-semibold text-amber-200">
+                    {data.anomalyBand ?? "Pending"}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-4">
@@ -162,11 +203,61 @@ export default function ScoreResult() {
                 </ul>
                 {data.duplicateIdentityScore != null && (
                   <p className="mt-2 text-[11px] text-slate-500">
-                    Duplicate or similarity signal: {data.duplicateIdentityScore}/100 (lower = more suspicious).
+                    Duplicate or similarity signal: {data.duplicateIdentityScore}/100 (higher = more suspicious).
                   </p>
                 )}
               </div>
             )}
+            {data.investigationSummary?.mlTopFeatures?.length ? (
+              <div className="rounded-xl border border-sky-700/60 bg-slate-900/80 p-4 text-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-sky-300">
+                  ML Top Features
+                </p>
+                <div className="mt-3 space-y-3">
+                  {data.investigationSummary.mlTopFeatures.map((feature) => (
+                    <article
+                      key={feature.name}
+                      className="rounded-lg border border-slate-700/60 bg-slate-950/50 p-3"
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-200">
+                          {feature.name.replace(/_/g, " ")}
+                        </p>
+                        <span className="text-[11px] text-slate-400">
+                          impact {feature.impact.toFixed(2)}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs text-slate-400">{feature.contribution}</p>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {data.investigationSummary?.anomalyTopSignals?.length ? (
+              <div className="rounded-xl border border-amber-700/60 bg-slate-900/80 p-4 text-sm">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-300">
+                  Anomaly Top Signals
+                </p>
+                <div className="mt-3 space-y-3">
+                  {data.investigationSummary.anomalyTopSignals.map((signal) => (
+                    <article
+                      key={signal.name}
+                      className="rounded-lg border border-slate-700/60 bg-slate-950/50 p-3"
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <p className="text-xs font-medium uppercase tracking-wide text-slate-200">
+                          {signal.name.replace(/_/g, " ")}
+                        </p>
+                        <span className="text-[11px] text-slate-400">
+                          score {(signal.score * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs text-slate-400">{signal.explanation}</p>
+                    </article>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div className="rounded-xl border border-slate-700/60 bg-slate-900/80 p-4 text-sm">
               <p className="text-xs uppercase tracking-wide text-slate-500">
                 Blockchain Status
@@ -221,20 +312,17 @@ export default function ScoreResult() {
                 How to interpret this score
               </p>
               <p className="mt-2 text-[11px] text-slate-500">
-                The numeric trust score is deterministic and rule-based. LLM output is advisory only and never changes the stored score.
+                The deterministic score, fake-engine score, and ML fraud probability are fused for operational review. LLM output is advisory only and never changes stored model outputs.
               </p>
               <ul className="mt-2 list-disc space-y-1 pl-5">
                 <li>
-                  &gt; 75 - strong organic behaviour and profile completeness
-                  consistent with genuine users.
+                  Base trust and fused trust close to 100 indicate stronger evidence of organic behavior.
                 </li>
                 <li>
-                  50 - 75 - mixed signals: some risk markers present, manual
-                  review recommended.
+                  Elevated ML probability with low fused trust means the account should be reviewed quickly.
                 </li>
                 <li>
-                  &lt; 50 - high-risk indicators such as abnormal ratios or
-                  low history; treat as likely fake.
+                  Top ML features explain which signals most influenced the model toward fraud.
                 </li>
               </ul>
             </div>

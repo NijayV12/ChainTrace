@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { api } from "../api/client";
 import { useAuth } from "../context/AuthContext";
 import AssistantPanel from "../components/AssistantPanel";
+import type { CaseAnchorResult, CaseIntelligence } from "../types/api";
 
 interface CaseAccount {
   account: {
@@ -13,6 +14,12 @@ interface CaseAccount {
     trustScore: number | null;
     fakeTrustScore: number | null;
     fakeClassification: string | null;
+    mlFraudProbability?: number | null;
+    mlRiskBand?: string | null;
+    anomalyScore?: number | null;
+    anomalyBand?: string | null;
+    fusedTrustScore?: number | null;
+    fusedClassification?: string | null;
     blockchainHash: string | null;
     user?: {
       name: string;
@@ -89,6 +96,8 @@ function formatDate(value: string) {
 export default function CaseDetail() {
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<CaseData | null>(null);
+  const [intelligence, setIntelligence] = useState<CaseIntelligence | null>(null);
+  const [anchorResult, setAnchorResult] = useState<CaseAnchorResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reportSummary, setReportSummary] = useState("");
@@ -101,8 +110,12 @@ export default function CaseDetail() {
   const navigate = useNavigate();
 
   const loadCase = async (caseId: string) => {
-    const res = await api.cases.get(caseId);
-    setData(res as unknown as CaseData);
+    const [caseRes, intelligenceRes] = await Promise.all([
+      api.cases.get(caseId),
+      api.cases.intelligence(caseId),
+    ]);
+    setData(caseRes as unknown as CaseData);
+    setIntelligence(intelligenceRes);
   };
 
   useEffect(() => {
@@ -110,9 +123,13 @@ export default function CaseDetail() {
     let active = true;
     (async () => {
       try {
-        const res = await api.cases.get(id);
+        const [caseRes, intelligenceRes] = await Promise.all([
+          api.cases.get(id),
+          api.cases.intelligence(id),
+        ]);
         if (!active) return;
-        setData(res as unknown as CaseData);
+        setData(caseRes as unknown as CaseData);
+        setIntelligence(intelligenceRes);
       } catch (err) {
         if (!active) return;
         setError(err instanceof Error ? err.message : "Failed to load case");
@@ -133,11 +150,14 @@ export default function CaseDetail() {
     const accounts = data?.accounts ?? [];
     const highRisk = accounts.filter(
       ({ account }) =>
+        account.fusedClassification === "HIGH_RISK" ||
         account.fakeClassification === "FAKE" ||
         account.fakeClassification === "HIGH_RISK"
     ).length;
     const suspicious = accounts.filter(
-      ({ account }) => account.fakeClassification === "SUSPICIOUS"
+      ({ account }) =>
+        account.fusedClassification === "SUSPICIOUS" ||
+        account.fakeClassification === "SUSPICIOUS"
     ).length;
     const anchored = accounts.filter(({ account }) => !!account.blockchainHash).length;
     return { highRisk, suspicious, anchored };
@@ -295,6 +315,21 @@ export default function CaseDetail() {
     URL.revokeObjectURL(url);
   };
 
+  const handleAnchorCase = async () => {
+    if (!id) return;
+    setBusy(true);
+    try {
+      const result = await api.cases.anchor(id);
+      setAnchorResult(result);
+      toast.success(`Case anchored in block #${result.blockchain.index}`);
+      await loadCase(id);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Anchoring failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -370,6 +405,20 @@ export default function CaseDetail() {
             >
               Export case brief
             </button>
+            <Link
+              to={`/cases/${data.id}/network`}
+              className="rounded-xl border border-violet-500/40 bg-violet-500/10 px-4 py-2 text-sm text-violet-100 hover:bg-violet-500/20"
+            >
+              Open network evidence
+            </Link>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={handleAnchorCase}
+              className="rounded-xl border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm text-sky-100 hover:bg-sky-500/20 disabled:opacity-60"
+            >
+              {busy ? "Anchoring..." : "Anchor case evidence"}
+            </button>
           </div>
         </div>
       </header>
@@ -390,6 +439,163 @@ export default function CaseDetail() {
         <div className="rounded-[1.5rem] border border-slate-800 bg-slate-950/50 p-5">
           <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Anchored on-chain</p>
           <p className="mt-3 text-3xl font-semibold text-sky-300">{summary.anchored}</p>
+        </div>
+      </section>
+
+      <section className="grid gap-6 xl:grid-cols-[1.2fr,0.8fr]">
+        <div className="rounded-[2rem] border border-slate-800/80 bg-slate-950/55 p-6 shadow-[0_0_50px_rgba(8,15,26,0.35)]">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Investigation intelligence</p>
+              <h2 className="mt-2 text-xl font-semibold text-white">Risk graph and case digest</h2>
+            </div>
+            <span className="rounded-full border border-slate-700 px-3 py-1 text-[11px] text-slate-300">
+              {intelligence?.summary.linkedRelationshipCount ?? 0} linked relationship(s)
+            </span>
+          </div>
+
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Platforms</p>
+              <p className="mt-2 text-lg font-semibold text-white">
+                {intelligence?.summary.platforms.join(", ") || "None"}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Users in scope</p>
+              <p className="mt-2 text-2xl font-semibold text-white">
+                {intelligence?.summary.userCount ?? 0}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Recent alerts</p>
+              <p className="mt-2 text-2xl font-semibold text-amber-200">
+                {intelligence?.summary.alertCount ?? 0}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Evidence digest</p>
+              <p className="mt-2 break-all text-xs text-slate-300">
+                {intelligence?.evidenceDigest ?? "Pending intelligence load"}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 grid gap-4 xl:grid-cols-[0.95fr,1.05fr]">
+            <div className="rounded-[1.5rem] border border-slate-800 bg-slate-900/35 p-5">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Highest risk account</p>
+              {intelligence?.summary.highestRiskAccount ? (
+                <>
+                  <p className="mt-3 text-lg font-semibold text-white">
+                    {intelligence.summary.highestRiskAccount.platform} @{intelligence.summary.highestRiskAccount.handle}
+                  </p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-4">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Duplicate risk</p>
+                      <p className="mt-1 text-xl font-semibold text-rose-200">
+                        {intelligence.summary.highestRiskAccount.duplicateIdentityScore}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Base trust</p>
+                      <p className="mt-1 text-xl font-semibold text-white">
+                        {intelligence.summary.highestRiskAccount.trustScore?.toFixed(2) ?? "--"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">Fraud score</p>
+                      <p className="mt-1 text-xl font-semibold text-white">
+                        {intelligence.summary.highestRiskAccount.fakeTrustScore?.toFixed(2) ?? "--"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500">ML probability</p>
+                      <p className="mt-1 text-xl font-semibold text-white">
+                        {intelligence.summary.highestRiskAccount.mlFraudProbability != null
+                          ? `${(intelligence.summary.highestRiskAccount.mlFraudProbability * 100).toFixed(1)}%`
+                          : "--"}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs text-slate-400">
+                    Fused decision: {intelligence.summary.highestRiskAccount.fusedClassification ?? "Pending"} | fused trust{" "}
+                    {intelligence.summary.highestRiskAccount.fusedTrustScore?.toFixed(2) ?? "--"} | ML band{" "}
+                    {intelligence.summary.highestRiskAccount.mlRiskBand ?? "Pending"} | anomaly{" "}
+                    {intelligence.summary.highestRiskAccount.anomalyScore != null
+                      ? `${(intelligence.summary.highestRiskAccount.anomalyScore * 100).toFixed(1)}%`
+                      : "--"}{" "}
+                    ({intelligence.summary.highestRiskAccount.anomalyBand ?? "Pending"})
+                  </p>
+                </>
+              ) : (
+                <p className="mt-3 text-sm text-slate-500">No account intelligence available yet.</p>
+              )}
+            </div>
+
+            <div className="rounded-[1.5rem] border border-slate-800 bg-slate-900/35 p-5">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Relationship map</p>
+              <div className="mt-4 space-y-3">
+                {intelligence?.relationships.length ? (
+                  intelligence.relationships.map((relationship, index) => (
+                    <article
+                      key={`${relationship.fromAccountId}-${relationship.toAccountId}-${index}`}
+                      className="rounded-xl border border-slate-800 bg-slate-950/45 p-3"
+                    >
+                      <p className="text-sm text-slate-100">
+                        Linked to {relationship.platform} @{relationship.handle}
+                      </p>
+                      <p className="mt-1 text-xs uppercase tracking-wide text-slate-500">
+                        Relation: {relationship.relation.replace(/_/g, " ")}
+                      </p>
+                    </article>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-500">No related-profile links found in this case.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-[2rem] border border-slate-800/80 bg-slate-950/55 p-6 shadow-[0_0_50px_rgba(8,15,26,0.35)]">
+          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Anchoring ledger</p>
+          <h2 className="mt-2 text-xl font-semibold text-white">Blockchain evidence status</h2>
+
+          <div className="mt-6 space-y-4">
+            <div className="rounded-[1.5rem] border border-slate-800 bg-slate-900/35 p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Latest evidence digest</p>
+              <p className="mt-2 break-all text-xs text-slate-300">
+                {anchorResult?.evidenceDigest ?? intelligence?.evidenceDigest ?? "No digest available"}
+              </p>
+            </div>
+            <div className="rounded-[1.5rem] border border-slate-800 bg-slate-900/35 p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Latest anchor result</p>
+              {anchorResult ? (
+                <>
+                  <p className="mt-2 text-sm text-slate-100">Block #{anchorResult.blockchain.index}</p>
+                  <p className="mt-2 break-all text-xs text-slate-400">{anchorResult.blockchain.blockHash}</p>
+                </>
+              ) : (
+                <p className="mt-2 text-sm text-slate-500">Anchor this case to preserve a tamper-evident digest.</p>
+              )}
+            </div>
+            <div className="rounded-[1.5rem] border border-slate-800 bg-slate-900/35 p-4">
+              <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Recent alert feed</p>
+              <div className="mt-3 space-y-3">
+                {intelligence?.recentAlerts.length ? (
+                  intelligence.recentAlerts.map((alert) => (
+                    <article key={alert.id} className="rounded-xl border border-slate-800 bg-slate-950/45 p-3">
+                      <p className="text-xs uppercase tracking-wide text-amber-200">{alert.riskLevel}</p>
+                      <p className="mt-1 text-sm text-slate-200">{alert.reason}</p>
+                      <p className="mt-2 text-xs text-slate-500">{formatDate(alert.createdAt)}</p>
+                    </article>
+                  ))
+                ) : (
+                  <p className="text-sm text-slate-500">No recent alerts attached to this case.</p>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -422,8 +628,8 @@ export default function CaseDetail() {
                       Investigator: {account.user?.name ?? "Unassigned"} • {account.user?.email ?? "No email"}
                     </p>
                   </div>
-                  <span className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-wide ${riskTone(account.fakeClassification)}`}>
-                    {account.fakeClassification ?? "PENDING"}
+                  <span className={`rounded-full border px-3 py-1 text-[11px] uppercase tracking-wide ${riskTone(account.fusedClassification ?? account.fakeClassification)}`}>
+                    {account.fusedClassification ?? account.fakeClassification ?? "PENDING"}
                   </span>
                 </div>
 
@@ -441,6 +647,31 @@ export default function CaseDetail() {
                       {account.fakeTrustScore != null ? account.fakeTrustScore.toFixed(2) : "--"}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">Operational fraud signal</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-4">
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">ML fraud probability</p>
+                    <p className="mt-2 text-2xl font-semibold text-white">
+                      {account.mlFraudProbability != null
+                        ? `${(account.mlFraudProbability * 100).toFixed(1)}%`
+                        : "--"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">{account.mlRiskBand ?? "Model pending"}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-4">
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Anomaly score</p>
+                    <p className="mt-2 text-2xl font-semibold text-white">
+                      {account.anomalyScore != null
+                        ? `${(account.anomalyScore * 100).toFixed(1)}%`
+                        : "--"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">{account.anomalyBand ?? "Pending"}</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-800 bg-slate-950/45 p-4">
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500">Fused trust score</p>
+                    <p className="mt-2 text-2xl font-semibold text-white">
+                      {account.fusedTrustScore != null ? account.fusedTrustScore.toFixed(2) : "--"}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">{account.fusedClassification ?? "Pending"}</p>
                   </div>
                 </div>
 

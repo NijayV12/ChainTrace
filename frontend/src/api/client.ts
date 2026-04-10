@@ -3,6 +3,8 @@ import type {
   AdminActionLogEntry,
   AdminRole,
   AdminUserSummary,
+  CaseAnchorResult,
+  CaseIntelligence,
   CaseListItem,
   ResultAccount,
 } from "../types/api";
@@ -88,6 +90,11 @@ export const api = {
         `/cases/${id}/analyst-decision/draft`,
         { method: "POST" }
       ),
+    intelligence: (id: string) => request<CaseIntelligence>(`/cases/${id}/intelligence`),
+    anchor: (id: string) =>
+      request<CaseAnchorResult>(`/cases/${id}/anchor`, {
+        method: "POST",
+      }),
     export: (id: string) =>
       request<Record<string, unknown>>(`/cases/${id}/export`),
   },

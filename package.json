@@ -6,9 +6,12 @@
   "scripts": {
     "setup": "node scripts/setup.js",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "dev:with-ai": "concurrently \"npm run ai:service\" \"npm run server\" \"npm run client\"",
+    "ai:service": "cd ai_engine && npm run build && npm run serve",
     "server": "cd backend && npm run dev",
     "client": "cd frontend && npm run dev",
-    "build": "npm run build:backend && npm run build:frontend",
+    "build": "npm run build:ai && npm run build:backend && npm run build:frontend",
+    "build:ai": "cd ai_engine && npm run build",
     "build:backend": "cd backend && npm run build",
     "build:frontend": "cd frontend && npm run build",
     "start": "cd backend && npm run start",

@@ -35,18 +35,32 @@ export default function UserDashboard() {
   }, []);
 
   const latest = accounts[0];
+  const elevatedML = accounts.filter(
+    (account) => (account.mlFraudProbability ?? 0) >= 0.45
+  ).length;
+  const unusualAnomaly = accounts.filter(
+    (account) => (account.anomalyScore ?? 0) >= 0.45
+  ).length;
 
-  const classificationLabel = (score: number | null) => {
+  const classificationLabel = (
+    score: number | null,
+    fusedClassification?: string | null
+  ) => {
+    if (fusedClassification) return fusedClassification;
     if (score == null) return "PENDING";
     if (score > 75) return "GENUINE";
     if (score >= 50) return "SUSPICIOUS";
     return "HIGH RISK";
   };
 
-  const classificationColor = (score: number | null) => {
-    if (score == null) return "bg-slate-700 text-slate-200";
-    if (score > 75) return "bg-emerald-500/20 text-emerald-300";
-    if (score >= 50) return "bg-amber-500/20 text-amber-300";
+  const classificationColor = (
+    score: number | null,
+    fusedClassification?: string | null
+  ) => {
+    const effective = fusedClassification ?? classificationLabel(score);
+    if (effective === "PENDING") return "bg-slate-700 text-slate-200";
+    if (effective === "GENUINE") return "bg-emerald-500/20 text-emerald-300";
+    if (effective === "SUSPICIOUS") return "bg-amber-500/20 text-amber-300";
     return "bg-rose-500/20 text-rose-300";
   };
 
@@ -70,7 +84,7 @@ export default function UserDashboard() {
         </Link>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-4">
         <motion.div
           className="rounded-xl border border-slate-700/60 bg-slate-900/80 p-4"
           initial={{ opacity: 0, y: 10 }}
@@ -97,10 +111,11 @@ export default function UserDashboard() {
           ) : latest ? (
             <span
               className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-medium ${classificationColor(
-                latest.trustScore
+                latest.trustScore,
+                latest.fusedClassification
               )}`}
             >
-              {classificationLabel(latest.trustScore)}
+              {classificationLabel(latest.trustScore, latest.fusedClassification)}
             </span>
           ) : (
             <p className="mt-2 text-sm text-slate-500">No accounts yet</p>
@@ -121,6 +136,24 @@ export default function UserDashboard() {
           </p>
           <p className="mt-3 text-xs text-slate-500">
             Stored scores are deterministic. Any AI explanation shown elsewhere is advisory and never changes the saved score.
+          </p>
+        </motion.div>
+        <motion.div
+          className="rounded-xl border border-slate-700/60 bg-slate-900/80 p-4"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+        >
+          <p className="text-xs uppercase tracking-wide text-slate-400">
+            ML / Anomaly Flags
+          </p>
+          <p className="mt-2 text-sm text-slate-300">
+            {loading
+              ? "Loading model signals..."
+              : `${elevatedML} elevated ML risk, ${unusualAnomaly} unusual anomaly pattern${unusualAnomaly === 1 ? "" : "s"}`}
+          </p>
+          <p className="mt-3 text-xs text-slate-500">
+            Hybrid scoring combines deterministic trust, fake-engine output, ML fraud probability, and anomaly detection.
           </p>
         </motion.div>
       </div>
@@ -146,7 +179,8 @@ export default function UserDashboard() {
                 <tr>
                   <th className="px-4 py-2 text-left font-medium">Account</th>
                   <th className="px-4 py-2 text-left font-medium">Status</th>
-                  <th className="px-4 py-2 text-left font-medium">Trust Score</th>
+                  <th className="px-4 py-2 text-left font-medium">Fused Trust</th>
+                  <th className="px-4 py-2 text-left font-medium">ML Risk</th>
                   <th className="px-4 py-2 text-left font-medium">Created</th>
                   <th className="px-4 py-2" />
                 </tr>
@@ -165,6 +199,9 @@ export default function UserDashboard() {
                         <div className="skeleton h-4 w-16" />
                       </td>
                       <td className="px-4 py-3">
+                        <div className="skeleton h-4 w-16" />
+                      </td>
+                      <td className="px-4 py-3">
                         <div className="skeleton h-4 w-24" />
                       </td>
                       <td className="px-4 py-3" />
@@ -173,7 +210,7 @@ export default function UserDashboard() {
                 ) : accounts.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={5}
+                      colSpan={6}
                       className="px-4 py-6 text-center text-sm text-slate-500"
                     >
                       No accounts yet.{" "}
@@ -197,15 +234,28 @@ export default function UserDashboard() {
                       <td className="px-4 py-3">
                         <span
                           className={`inline-flex rounded-full px-2.5 py-1 text-[11px] ${classificationColor(
-                            acc.trustScore
+                            acc.fusedTrustScore ?? acc.trustScore,
+                            acc.fusedClassification
                           )}`}
                         >
-                          {classificationLabel(acc.trustScore)}
+                          {classificationLabel(acc.fusedTrustScore ?? acc.trustScore, acc.fusedClassification)}
                         </span>
                       </td>
                       <td className="px-4 py-3 align-middle text-slate-200">
-                        {acc.trustScore != null ? (
-                          <span>{acc.trustScore.toFixed(2)}</span>
+                        {acc.fusedTrustScore != null || acc.trustScore != null ? (
+                          <span>{(acc.fusedTrustScore ?? acc.trustScore ?? 0).toFixed(2)}</span>
+                        ) : (
+                          <span className="text-slate-500">Pending</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-slate-300">
+                        {acc.mlFraudProbability != null ? (
+                          <div>
+                            <div>{(acc.mlFraudProbability * 100).toFixed(1)}%</div>
+                            <div className="text-slate-500">
+                              {acc.mlRiskBand ?? acc.anomalyBand ?? "Pending"}
+                            </div>
+                          </div>
                         ) : (
                           <span className="text-slate-500">Pending</span>
                         )}
@@ -232,7 +282,7 @@ export default function UserDashboard() {
           <TrustScoreChart
             points={accounts.map((a) => ({
               createdAt: a.createdAt,
-              trustScore: a.fakeTrustScore ?? a.trustScore,
+              trustScore: a.fusedTrustScore ?? a.fakeTrustScore ?? a.trustScore,
             }))}
           />
         </div>

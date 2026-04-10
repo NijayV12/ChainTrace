@@ -41,6 +41,9 @@ interface RiskCaseAccount {
     platform: string;
     handle: string;
     fakeClassification?: string | null;
+    mlFraudProbability?: number | null;
+    anomalyScore?: number | null;
+    fusedClassification?: string | null;
     user?: { name: string; email: string; phone?: string | null; role: string };
   };
 }
@@ -104,6 +107,8 @@ export default function AdminDashboard() {
           (entry.accounts ?? [])
             .filter(
               ({ account }) =>
+                account.fusedClassification === "SUSPICIOUS" ||
+                account.fusedClassification === "HIGH_RISK" ||
                 account.fakeClassification === "SUSPICIOUS" ||
                 account.fakeClassification === "HIGH_RISK" ||
                 account.fakeClassification === "FAKE"
@@ -111,6 +116,22 @@ export default function AdminDashboard() {
             .map(({ account }) => ({ caseTitle: entry.title, account }))
         )
         .slice(0, 9),
+    [cases]
+  );
+
+  const mlHotspots = useMemo(
+    () =>
+      cases
+        .flatMap((entry) => (entry.accounts ?? []).map(({ account }) => account))
+        .filter((account) => (account.mlFraudProbability ?? 0) >= 0.65).length,
+    [cases]
+  );
+
+  const anomalyHotspots = useMemo(
+    () =>
+      cases
+        .flatMap((entry) => (entry.accounts ?? []).map(({ account }) => account))
+        .filter((account) => (account.anomalyScore ?? 0) >= 0.45).length,
     [cases]
   );
 
@@ -137,7 +158,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      <section className="grid gap-4 md:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-5">
         <div className="rounded-xl border border-slate-700/60 bg-slate-900/80 p-4">
           <p className="text-xs uppercase tracking-wide text-slate-500">Total Users</p>
           <p className="mt-2 text-3xl font-semibold text-white">
@@ -180,6 +201,19 @@ export default function AdminDashboard() {
             <div className="h-1.5 w-full rounded-full bg-slate-800">
               <div className="h-1.5 rounded-full bg-rose-400" style={{ width: `${pct(highRisk)}%` }} />
             </div>
+          </div>
+        </div>
+        <div className="rounded-xl border border-slate-700/60 bg-slate-900/80 p-4 text-xs">
+          <p className="text-xs uppercase tracking-wide text-slate-500">ML / Anomaly Hotspots</p>
+          <div className="mt-3 space-y-2 text-slate-300">
+            <p>
+              <span className="text-sky-300">{mlHotspots}</span> ML high-risk account
+              {mlHotspots === 1 ? "" : "s"}
+            </p>
+            <p>
+              <span className="text-amber-300">{anomalyHotspots}</span> unusual anomaly pattern
+              {anomalyHotspots === 1 ? "" : "s"}
+            </p>
           </div>
         </div>
       </section>
@@ -313,7 +347,14 @@ export default function AdminDashboard() {
                     {account.platform} | @{account.handle}
                   </p>
                   <p className="mt-1 text-sm font-medium text-slate-100">
-                    {account.fakeClassification ?? "PENDING"}
+                    {account.fusedClassification ?? account.fakeClassification ?? "PENDING"}
+                  </p>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    ML {(account.mlFraudProbability != null
+                      ? `${(account.mlFraudProbability * 100).toFixed(1)}%`
+                      : "--")} | anomaly {(account.anomalyScore != null
+                      ? `${(account.anomalyScore * 100).toFixed(1)}%`
+                      : "--")}
                   </p>
                   <p className="mt-1 text-[11px] text-slate-400">
                     Case: <span className="text-slate-200">{caseTitle}</span>

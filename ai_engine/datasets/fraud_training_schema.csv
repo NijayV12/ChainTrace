@@ -1,0 +1,5 @@
+account_age_months,profile_complete,followers,following,posts,duplicate_identity_score,suspicious_login_score,linked_profile_count,ip_device_variation,deterministic_trust_score,fake_engine_trust_score,fused_trust_score,is_fake_label
+36,1,2400,300,180,5,8,0,12,86.2,88.4,85.7,0
+18,1,540,420,44,22,26,1,18,72.1,69.8,68.4,0
+2,0,4,650,1,85,80,4,78,18.5,22.4,15.6,1
+1,0,0,950,0,96,91,5,94,6.2,10.8,4.9,1
