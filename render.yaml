@@ -3,7 +3,7 @@ services:
     name: chaintrace-api
     env: node
     rootDir: .
-    buildCommand: cd ai_engine && npm install && npm run build && cd ../backend && npm install && npm run build
+    buildCommand: cd ai_engine && npm install --include=dev && npm run build && cd ../backend && npm install --include=dev && npm run build && npx prisma db push && npx prisma db seed
     startCommand: cd backend && npm run start
     healthCheckPath: /health
     envVars:
