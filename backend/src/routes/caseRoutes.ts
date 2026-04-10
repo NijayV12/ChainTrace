@@ -11,6 +11,8 @@ import {
   draftInvestigatorReport,
   draftAnalystDecision,
 } from "../services/caseService.js";
+import { buildCaseInvestigationIntelligence } from "../services/investigationIntelligenceService.js";
+import { addEvidenceToBlockchain } from "../services/blockchainService.js";
 import { handleValidation, uuidParam } from "../middleware/validate.js";
 import { body } from "express-validator";
 
@@ -59,6 +61,20 @@ router.get("/:id", uuidParam, handleValidation, async (req: AuthRequest, res: Re
   }
   res.json(c);
 });
+
+router.get(
+  "/:id/intelligence",
+  uuidParam,
+  handleValidation,
+  async (req: AuthRequest, res: Response) => {
+    const intelligence = await buildCaseInvestigationIntelligence(req.params.id);
+    if (!intelligence) {
+      res.status(404).json({ error: "Case not found" });
+      return;
+    }
+    res.json(intelligence);
+  }
+);
 
 // Update case status / assignment – investigators and super admins.
 router.patch(
@@ -184,6 +200,40 @@ router.get("/:id/export", uuidParam, handleValidation, async (req: AuthRequest, 
   res.setHeader("Content-Type", "application/json");
   res.json(c);
 });
+
+router.post(
+  "/:id/anchor",
+  requireRole("INVESTIGATOR", "ANALYST", "SUPER_ADMIN"),
+  uuidParam,
+  handleValidation,
+  async (req: AuthRequest, res: Response) => {
+    const intelligence = await buildCaseInvestigationIntelligence(req.params.id);
+    if (!intelligence) {
+      res.status(404).json({ error: "Case not found" });
+      return;
+    }
+
+    const block = addEvidenceToBlockchain({
+      identityHash: intelligence.evidenceDigest,
+      entityType: "CASE",
+      entityId: req.params.id,
+      evidenceType: "CASE_EXPORT",
+      summary: `Case ${req.params.id} anchored with ${intelligence.summary.accountCount} account(s)`,
+      source: "case-routes",
+      metadata: {
+        caseStatus: intelligence.summary.caseStatus,
+        relationshipCount: intelligence.summary.linkedRelationshipCount,
+        alertCount: intelligence.summary.alertCount,
+      },
+    });
+
+    res.status(201).json({
+      caseId: req.params.id,
+      evidenceDigest: intelligence.evidenceDigest,
+      blockchain: block,
+    });
+  }
+);
 
 export default router;
 

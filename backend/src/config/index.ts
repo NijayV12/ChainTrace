@@ -37,6 +37,10 @@ export const config = {
     model: process.env.LLM_MODEL ?? "gpt-4o-mini",
     reasoningEnabled: process.env.LLM_REASONING_ENABLED === "true",
   },
+  aiEngine: {
+    url: process.env.AI_ENGINE_URL?.trim() || "",
+    timeoutMs: parseInt(process.env.AI_ENGINE_TIMEOUT_MS ?? "5000", 10),
+  },
   log: {
     level: process.env.LOG_LEVEL ?? "info",
   },

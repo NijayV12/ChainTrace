@@ -1,23 +1,21 @@
-import { prisma } from "../database/client.js";
-import {
-  computeTrustScore,
-  classifyScore,
-  type ScoringInput,
-  type Classification,
-} from "../ai/scoring.js";
-import {
-  computeFakeTrustScore,
-  classifyFakeScore,
-} from "../ai/fakeScoring.js";
+import { classifyFakeScore } from "../ai/fakeScoring.js";
+import { classifyScore } from "../ai/scoring.js";
 import { getLLMReasoning } from "../ai/llmReasoning.js";
+import { prisma } from "../database/client.js";
+import { logger } from "../lib/logger.js";
 import {
-  hashIdentity,
   addToBlockchain,
+  hashIdentity,
   verifyOnChain,
 } from "./blockchainService.js";
-import { extractFakeFeatures } from "./fakeFeatureExtractor.js";
-import { findSimilarAccounts, type SimilarAccountMatch } from "./similarAccountDetector.js";
-import { logger } from "../lib/logger.js";
+import {
+  evaluateAccountRisk,
+  summarizeAccountInvestigation,
+} from "./aiEngineService.js";
+import {
+  findSimilarAccounts,
+  type SimilarAccountMatch,
+} from "./similarAccountDetector.js";
 
 export interface SubmitVerificationInput {
   userId: string;
@@ -45,12 +43,10 @@ export async function submitVerification(input: SubmitVerificationInput) {
     },
   });
 
-  // Queue scoring (in production would be a job; here we do inline for simplicity)
   await processScoring(account.id);
-  const updated = await prisma.socialAccount.findUniqueOrThrow({
+  return prisma.socialAccount.findUniqueOrThrow({
     where: { id: account.id },
   });
-  return updated;
 }
 
 export async function processScoring(accountId: string): Promise<void> {
@@ -65,25 +61,25 @@ export async function processScoring(accountId: string): Promise<void> {
     handle: account.handle,
   });
 
-  const input: ScoringInput = {
-    accountAgeMonths: account.accountAge,
-    profileComplete: account.profileComplete,
-    followers: account.followers,
-    following: account.following,
-    posts: account.posts,
-    duplicateIdentityScore: similarResult.duplicateIdentityScore,
-    suspiciousLoginScore: 80, // placeholder: could check activity_logs
-  };
-
-  const trustScore = computeTrustScore(input);
-  const classification = classifyScore(trustScore);
-
   const activityLogs = await prisma.activityLog.findMany({
     where: { userId: account.userId },
   });
-  const fakeFeatures = extractFakeFeatures(account, activityLogs);
-  const fakeTrustScore = computeFakeTrustScore(fakeFeatures);
-  const fakeClassification = classifyFakeScore(fakeTrustScore);
+
+  const {
+    trustScore,
+    classification,
+    fakeTrustScore,
+    fakeClassification,
+    mlAssessment,
+    anomalyAssessment,
+    fusedTrustScore,
+    fusedClassification,
+  } = await evaluateAccountRisk({
+    account,
+    activityLogs,
+    duplicateIdentityScore: similarResult.duplicateIdentityScore,
+    linkedProfileCount: similarResult.similarAccounts.length,
+  });
 
   const identityHash = hashIdentity(account.id, account.platform, account.handle);
   const { blockHash } = addToBlockchain(identityHash, account.id);
@@ -101,8 +97,8 @@ export async function processScoring(accountId: string): Promise<void> {
       following: account.following,
       posts: account.posts,
     });
-  } catch (e) {
-    logger.warn("LLM reasoning failed", e);
+  } catch (error) {
+    logger.warn("LLM reasoning failed", error);
   }
 
   await prisma.socialAccount.update({
@@ -113,6 +109,15 @@ export async function processScoring(accountId: string): Promise<void> {
       blockchainHash: blockHash,
       fakeTrustScore,
       fakeClassification,
+      mlFraudProbability: mlAssessment.fraudProbability,
+      mlRiskBand: mlAssessment.riskBand,
+      mlConfidence: mlAssessment.confidence,
+      mlTopFeatures: JSON.stringify(mlAssessment.topFeatures),
+      anomalyScore: anomalyAssessment.anomalyScore,
+      anomalyBand: anomalyAssessment.anomalyBand,
+      anomalyTopSignals: JSON.stringify(anomalyAssessment.topSignals),
+      fusedTrustScore,
+      fusedClassification,
       similarAccountsDetected:
         similarResult.similarAccounts.length > 0
           ? JSON.stringify(similarResult.similarAccounts)
@@ -127,31 +132,45 @@ export async function processScoring(accountId: string): Promise<void> {
   });
 
   const alertReasons: string[] = [
-    `Scores – base: ${trustScore.toFixed(2)}, fake-engine: ${fakeTrustScore.toFixed(2)}. Classification: ${fakeClassification ?? classification}.`,
+    `Scores - base: ${trustScore.toFixed(2)}, fake-engine: ${fakeTrustScore.toFixed(
+      2
+    )}, fused: ${fusedTrustScore.toFixed(2)}. ML fraud probability: ${(
+      mlAssessment.fraudProbability * 100
+    ).toFixed(1)}%. Anomaly score: ${(anomalyAssessment.anomalyScore * 100).toFixed(
+      1
+    )}%. Classification: ${fusedClassification}.`,
   ];
+
   if (similarResult.isSuspicious) {
     alertReasons.push(
       `Similar accounts in database: ${similarResult.similarAccounts.length} found (duplicate/similar identity signal).`
     );
   }
+
   if (
     classification === "SUSPICIOUS" ||
     classification === "HIGH_RISK" ||
     fakeClassification === "SUSPICIOUS" ||
     fakeClassification === "FAKE" ||
+    mlAssessment.riskBand === "HIGH" ||
+    mlAssessment.riskBand === "CRITICAL" ||
+    anomalyAssessment.anomalyBand === "SEVERE" ||
+    fusedClassification === "SUSPICIOUS" ||
+    fusedClassification === "HIGH_RISK" ||
     similarResult.isSuspicious
   ) {
     await prisma.alert.create({
       data: {
         accountId,
-        riskLevel: fakeClassification ?? classification,
+        riskLevel: fusedClassification ?? fakeClassification ?? classification,
         reason: alertReasons.join(" "),
       },
     });
   }
 
-  logger.info(`Scoring done for account ${accountId}: ${trustScore} (${classification})`);
-  return;
+  logger.info(
+    `Scoring done for account ${accountId}: ${trustScore} (${classification}), ML ${(mlAssessment.fraudProbability * 100).toFixed(1)}%, fused ${fusedTrustScore} (${fusedClassification})`
+  );
 }
 
 export async function getVerificationResult(accountId: string, userId: string) {
@@ -159,20 +178,27 @@ export async function getVerificationResult(accountId: string, userId: string) {
     where: { id: accountId, userId },
   });
   if (!account) return null;
-  const classification = account.trustScore != null ? classifyScore(account.trustScore) : null;
+
+  const classification =
+    account.trustScore != null ? classifyScore(account.trustScore) : null;
   const fakeClassification =
     account.fakeTrustScore != null
       ? classifyFakeScore(account.fakeTrustScore)
       : null;
   const onChain = account.blockchainHash
-    ? verifyOnChain(
-        hashIdentity(account.id, account.platform, account.handle)
-      )
+    ? verifyOnChain(hashIdentity(account.id, account.platform, account.handle))
     : false;
   const similarAccountsDetected =
-    typeof account.similarAccountsDetected === "string" && account.similarAccountsDetected
+    typeof account.similarAccountsDetected === "string" &&
+    account.similarAccountsDetected
       ? (JSON.parse(account.similarAccountsDetected) as SimilarAccountMatch[])
       : null;
+  const activityLogs = await prisma.activityLog.findMany({
+    where: { userId: account.userId },
+    orderBy: { loginTime: "desc" },
+    take: 25,
+  });
+  const investigationSummary = await summarizeAccountInvestigation(account, activityLogs);
 
   return {
     ...account,
@@ -180,6 +206,7 @@ export async function getVerificationResult(accountId: string, userId: string) {
     fakeClassification: fakeClassification ?? "PENDING",
     onChain,
     similarAccountsDetected,
+    investigationSummary,
   };
 }
 

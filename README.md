@@ -1,248 +1,202 @@
-## CHAINTRACE
+# CHAINTRACE
 
-**Blockchain Powered Social Media Identity Verification & Fake Profile Detection Platform.**
+Blockchain-powered social media identity verification, fake-profile detection, and investigation platform.
 
-Frontend (React + Vite) · Backend (Node + Express + Prisma) · Lightweight PoW blockchain · Deterministic AI scoring + optional LLM reasoning.
+Frontend (React + Vite) · Backend (Node + Express + Prisma) · Shared `ai_engine` runtime · Lightweight PoW blockchain · Hybrid deterministic + ML fraud analysis.
 
----
+## Features
 
-### 1. Features
+- Investigator workflow: login, submit social accounts, review trust/risk outputs, open cases, and anchor evidence on-chain.
+- Analyst and admin workflow: review case intelligence, alerts, suspicious clusters, anomaly hotspots, and supervisory decisions.
+- Hybrid intelligence engine:
+  - deterministic trust score
+  - fake-profile risk score
+  - ML fraud probability, confidence, and top features
+  - anomaly score and top behavioral signals
+  - fused trust classification for triage
+- Dedicated `ai_engine` boundary:
+  - shared package for feature extraction, scoring, fusion, and summaries
+  - optional HTTP runtime service
+  - optional Python FastAPI inference backend for future XGBoost / LightGBM / Isolation Forest
+- Case intelligence:
+  - linked profile relationships
+  - recent alert clustering
+  - highest-risk account summary
+  - network evidence page in the frontend
+- Blockchain evidence ledger:
+  - stable identity hashing
+  - deterministic evidence hashing
+  - case anchoring endpoint and explorer UI
 
-- **User flow**: Register/Login → Dashboard → Submit social account → Deterministic trust score → On-chain anchoring.
-- **Admin flow**: Admin login → Investigation dashboard → Risk analytics, suspicious accounts, alerts, activity timeline, blockchain view.
-- **Lightweight blockchain**: File-backed `chain.json` with SHA-256, Proof-of-Work (configurable difficulty), explorer APIs.
-- **Deterministic AI scoring engine**:
-  - `score = 0.25*account_age_score + 0.20*profile_completeness_score + 0.20*follower_ratio_score + 0.15*posting_pattern_score + 0.10*duplicate_identity_score + 0.10*suspicious_login_score`
-  - LLM reasoning layer can explain scores but **never modifies** them.
-
----
-
-### 2. Project structure
+## Project Structure
 
 ```text
-backend/        # API gateway, services, Prisma, auth, blockchain, AI scoring
-frontend/       # React SPA (landing, user/admin flows, explorer)
-blockchain/     # (legacy) standalone blockchain module (backend now vendors its code)
-ai_engine/      # placeholder package metadata for AI engine
+backend/        # API, auth, workflows, Prisma, alerts, blockchain orchestration
+frontend/       # React SPA for dashboards, case workspace, network evidence, explorer
+ai_engine/      # shared scoring/ML engine + optional HTTP runtime + optional Python service
 auth/           # shared role types
-database/       # (logical) database layer handled via Prisma in backend/
-admin/          # (logical) admin layer implemented in backend/src/admin
-workers/        # background queue (backend/src/workers)
-tests/          # high-level test docs (backend has concrete tests)
-docs/           # api.md and future architecture docs
+blockchain/     # legacy standalone blockchain module
+database/       # logical DB layer handled through Prisma in backend/
+admin/          # logical admin layer implemented in backend/src/admin
+workers/        # background queue helpers
+docs/           # API docs and future architecture notes
 scripts/        # setup script
 ```
 
-Backend (selected files):
+## Key Files
 
-- `src/app.ts` – Express app, route wiring, middleware.
-- `src/auth/*` – JWT, middleware, login/register service.
-- `src/ai/scoring.ts` – deterministic trust score + classification.
-- `src/ai/llmReasoning.ts` – optional LLM explanation layer (OpenAI).
-- `src/blockchain/*` – `Block` and `Chain` with PoW and file persistence.
-- `src/services/verificationService.ts` – verification + scoring + alerts + blockchain anchoring.
-- `src/admin/adminRoutes.ts` – admin analytics, suspicious accounts, alerts, activity, blockchain.
+### Backend
 
-Frontend (selected files):
+- `backend/src/services/aiEngineService.ts`: local or HTTP-based `ai_engine` orchestration
+- `backend/src/services/verificationService.ts`: verification, score fusion, ML/anomaly persistence, alerts, blockchain anchoring
+- `backend/src/services/investigationIntelligenceService.ts`: case summaries, linked relationships, highest-risk account selection
+- `backend/src/services/blockchainService.ts`: stable evidence hashing and case anchoring
+- `backend/src/routes/caseRoutes.ts`: case intelligence and anchor endpoints
 
-- `src/pages/Landing.tsx` – marketing/landing page.
-- `src/pages/UserLogin.tsx`, `AdminLogin.tsx`.
-- `src/pages/UserDashboard.tsx` – user metrics + accounts list.
-- `src/pages/VerificationForm.tsx` – submit verification.
-- `src/pages/ScoreResult.tsx` – trust score view.
-- `src/pages/AdminDashboard.tsx` – risk analytics, alerts, activity timeline.
-- `src/pages/BlockchainExplorer.tsx` – chain explorer UI.
+### Frontend
 
----
+- `frontend/src/pages/UserDashboard.tsx`: investigator-facing dashboard with fused trust and ML risk
+- `frontend/src/pages/ScoreResult.tsx`: score detail, ML probability, anomaly score, top features/signals
+- `frontend/src/pages/CaseDetail.tsx`: case workspace, intelligence digest, anchoring
+- `frontend/src/pages/CaseNetwork.tsx`: cluster and linked-profile evidence view
+- `frontend/src/pages/AdminDashboard.tsx`: hotspot analytics and suspicious account monitoring
+- `frontend/src/pages/BlockchainExplorer.tsx`: chain explorer with evidence-oriented payloads
 
-### 3. Prerequisites
+### AI Engine
 
-- Node.js **>= 18**
+- `ai_engine/src/scoring.ts`: deterministic trust scoring
+- `ai_engine/src/fakeScoring.ts`: fake-profile scoring
+- `ai_engine/src/ml.ts`: ML fraud and anomaly assessment
+- `ai_engine/src/fusion.ts`: score fusion
+- `ai_engine/src/investigation.ts`: shared investigation summary helpers
+- `ai_engine/src/httpService.ts`: runtime boundary
+- `ai_engine/python_service/app/main.py`: optional Python inference service
+
+## Prerequisites
+
+- Node.js `>= 18`
 - npm
+- Postgres
 
-No message broker is required; Prisma uses **Postgres** and the blockchain uses a JSON file under `./data/chain`.
+Optional for the Python ML service:
 
----
+- Python `>= 3.10`
 
-### 4. Setup & run (one-time + dev)
+## Setup
 
 From the repository root:
 
 ```bash
-# one-time setup: install deps, push Prisma schema, seed demo data
 npm run setup
-
-# start backend (port 4000) and frontend (port 5173) together
-npm run dev
 ```
 
-Then open:
+That installs dependencies, prepares Prisma, and seeds demo data where applicable.
+
+## Development
+
+```bash
+# backend + frontend
+npm run dev
+
+# ai_engine runtime + backend + frontend
+npm run dev:with-ai
+
+# apply the latest Prisma schema
+npm run db:push
+```
+
+Local endpoints:
 
 - Frontend: `http://localhost:5173`
-- API: `http://localhost:4000`
-- Health check: `http://localhost:4000/health`
+- Backend API: `http://localhost:4000`
+- Backend health: `http://localhost:4000/health`
+- AI engine health: `http://localhost:4010/health`
 
-Environment:
+## Environment
 
-- Copy `.env.example` to `.env` if you want to customize values.
-- Backend uses `backend/.env` for Prisma + runtime config.
-- For local development and production, set `DATABASE_URL` to a Postgres connection string.
+Copy `.env.example` to `.env` if needed.
 
----
+Important values:
 
-### 4.1 Deploying on Vercel + Render
+- `DATABASE_URL`: Postgres connection string
+- `AI_ENGINE_URL=http://localhost:4010`: tells backend to use the `ai_engine` HTTP boundary
+- `AI_ENGINE_TIMEOUT_MS=5000`: backend timeout for `ai_engine`
+- `AI_ENGINE_PORT=4010`: port used by the `ai_engine` service
+- `AI_ENGINE_PYTHON_URL=http://localhost:8010`: optional Python inference endpoint used by `ai_engine`
 
-- **Frontend**: deploy `frontend/` to **Vercel**
-- **Backend**: deploy `backend/` to **Render** as a **Web Service**
+## Deployment
 
-Frontend settings:
+### Frontend on Vercel
 
-- Root directory: `frontend`
-- Build command: `npm run build`
+- Import the repo into Vercel.
+- Set the root directory to `frontend`.
+- Build command: `npm install && npm run build`
 - Output directory: `dist`
-- Environment variable:
-  - `VITE_API_URL=https://your-render-service.onrender.com`
+- Set `VITE_API_URL` to your deployed backend URL, for example `https://chaintrace-api.onrender.com`
 
-Backend settings:
+The SPA rewrite config is already present in `frontend/vercel.json`.
 
-- Root directory: `backend`
-- Build command: `npm install && npm run build && npx prisma db push`
-- Start command: `npm run start`
-- Environment variables:
-  - `NODE_ENV=production`
-  - `PORT=10000`
-  - `JWT_SECRET=change-this-in-production`
-  - `DATABASE_URL=...`
-  - `BLOCKCHAIN_DATA_DIR=./data/chain`
-  - `CORS_ALLOWED_ORIGINS=https://your-vercel-app.vercel.app`
-  - `OPENAI_API_KEY=` (optional)
-  - `LLM_REASONING_ENABLED=false`
+### Backend on Render
 
-Notes:
+- Import the repo into Render as a Web Service.
+- Use the repo root so Render can see both `backend/` and `ai_engine/`.
+- A Render blueprint is already included in `render.yaml`.
+- If you prefer manual settings:
+  - Build command: `cd ai_engine && npm install && npm run build && cd ../backend && npm install && npm run build`
+  - Start command: `cd backend && npm run start`
 
-- The frontend uses `VITE_API_URL` in production and falls back to the local Vite proxy in development.
-- Vercel SPA route rewrites are configured in `frontend/vercel.json`.
-- Create a **Render Postgres** database and use its connection string for `DATABASE_URL`.
+Required environment variables on Render:
 
----
+- `DATABASE_URL`
+- `JWT_SECRET`
+- `CORS_ALLOWED_ORIGINS`
 
-### 5. Demo credentials & sample data
+Optional environment variables:
 
-The Prisma seed (`backend/prisma/seed.ts`) creates two demo users:
+- `OPENAI_API_KEY`
+- `GROQ_API_KEY`
+- `LLM_API_KEY`
+- `AI_ENGINE_URL`
+- `AI_ENGINE_PYTHON_URL`
 
-- **Admin**
-  - Email: `admin@chaintrace.io`
-  - Password: `demo1234`
-  - Role: `ADMIN`
-- **User**
-  - Email: `user@demo.com`
-  - Password: `demo1234`
-  - Role: `USER`
-
-Use these to explore:
-
-- User login via `/login` → submit verifications, view scores, see user dashboard.
-- Admin login via `/admin/login` → admin investigation dashboard & blockchain view.
-
----
-
-### 6. Architecture overview
-
-- **Frontend (React)** – SPA with:
-  - Landing page, user/admin auth screens.
-  - User dashboard with animated cards, skeleton loaders, and table of social accounts.
-  - Verification form page and score result page.
-  - Admin dashboard (risk analytics cards, risk distribution bars, alerts list, activity timeline).
-  - Blockchain explorer page.
-
-- **API gateway (Express)** – single entrypoint exposing:
-  - `/api/v1/auth/*` – registration, login.
-  - `/api/v1/users/*` – user accounts & verification.
-  - `/api/v1/admin/*` – admin analytics & investigations.
-  - `/api/v1/blockchain/*` – blockchain explorer APIs.
-
-- **Auth service** – JWT bearer auth with roles:
-  - `USER` – can manage only their own accounts.
-  - `ADMIN` – can access analytics, all accounts, alerts, blockchain status.
-
-- **Verification + AI scoring**:
-  - Deterministic scoring function combines:
-    - account age, profile completeness, follower/following ratio, posting patterns,
-      duplicate identity signal and suspicious login signal.
-  - Resulting score ∈ \[0, 100] and classification:
-    - `GENUINE` if score > 75
-    - `SUSPICIOUS` if 50–75
-    - `HIGH_RISK` if < 50
-  - Optional LLM layer (OpenAI) can generate:
-    - natural-language reason,
-    - fraud likelihood explanation,
-    - admin recommendation.
-  - The LLM **never** changes the computed numeric score.
-
-- **Blockchain service**:
-  - Custom `Block` and `Chain` implementation with:
-    - index, timestamp, data hash, previous hash, nonce.
-    - Proof-of-Work (difficulty prefix of 4 zeroes).
-  - Chain stored as `chain.json` under `./data/chain`.
-  - Only hashed identity data is stored (`identityHash`, `accountId`).
-  - Explorer APIs expose full chain and individual blocks.
-
-- **Background worker / queue**:
-  - `p-queue` based lightweight scoring worker used by `verificationService`.
-  - In this demo, scoring is run inline for simplicity, but the worker
-    (`backend/src/workers/scoringQueue.ts`) is ready to be used as an async queue.
-
-- **Database layer**:
-  - Prisma models map to required tables:
-    - `User` – users.
-    - `SocialAccount` – social media accounts and scoring attributes.
-    - `ActivityLog` – login events with IP/device.
-    - `Alert` – risk alerts (Suspicious / High risk).
-
----
-
-### 7. Tests
-
-Backend tests (Vitest):
-
-- **Unit**:
-  - `src/ai/scoring.test.ts` – deterministic scoring & classification boundaries.
-- **Blockchain integrity**:
-  - `src/blockchain/Chain.test.ts` – mine a block, verify chain, reload from disk.
-- **API test**:
-  - `src/app.test.ts` – `/health` endpoint via Supertest.
-
-Run:
+After first deploy, run Prisma schema sync against the production database:
 
 ```bash
 cd backend
-npm test
+npx prisma db push
 ```
 
-Frontend tests are wired with Vitest and can be extended as needed:
+## Optional Python ML Service
+
+The project is ready for a Python-backed inference service for XGBoost / LightGBM and anomaly models.
+
+See:
+
+- `ai_engine/python_service/README.md`
+- `ai_engine/datasets/README.md`
+- `ai_engine/datasets/fraud_training_schema.csv`
+
+## Current Architecture
+
+- Frontend: presents fraud probability, anomaly score, top features, case intelligence, and network evidence
+- Backend: API, auth, workflow orchestration, persistence, alerts, blockchain
+- `ai_engine`: feature extraction, scoring, ML inference, anomaly inference, fusion, summaries
+- Optional Python service: future production-grade tabular fraud and anomaly inference
+
+## Verification
+
+Build commands used during this implementation:
 
 ```bash
-cd frontend
-npm test
+cd ai_engine && npm run build
+cd backend && npm run build
+cd frontend && npm run build
 ```
 
----
+## Important Follow-Up
 
-### 8. API reference
+The Prisma schema now includes ML, anomaly, and fused-score fields. Apply it to your database before expecting those values to persist:
 
-A concise API reference lives in `docs/api.md` and covers:
-
-- Auth endpoints (register/login).
-- User verification and score result endpoints.
-- Admin analytics, alerts, and activity.
-- Blockchain explorer endpoints.
-
----
-
-### 9. Security notes
-
-- JWT secret and DB path are configurable via environment variables – **change `JWT_SECRET` in production**.
-- Passwords are stored using **bcrypt** hashes.
-- CORS is enabled for local development; in production restrict `origin`.
-- Only hashed identity data is written to the blockchain; raw PII stays in the database.
-
+```bash
+npm run db:push
+```

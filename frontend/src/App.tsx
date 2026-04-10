@@ -14,6 +14,7 @@ const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
 const BlockchainExplorer = lazy(() => import("./pages/BlockchainExplorer"));
 const CasesList = lazy(() => import("./pages/CasesList"));
 const CaseDetail = lazy(() => import("./pages/CaseDetail"));
+const CaseNetwork = lazy(() => import("./pages/CaseNetwork"));
 const CaseNew = lazy(() => import("./pages/CaseNew"));
 const AdminUserCreate = lazy(() => import("./pages/AdminUserCreate"));
 
@@ -149,6 +150,16 @@ export default function App() {
           <Protected roles={["SUPER_ADMIN", "ANALYST", "INVESTIGATOR"]}>
             <RoutedPage>
               <CaseDetail />
+            </RoutedPage>
+          </Protected>
+        }
+      />
+      <Route
+        path="/cases/:id/network"
+        element={
+          <Protected roles={["SUPER_ADMIN", "ANALYST", "INVESTIGATOR"]}>
+            <RoutedPage>
+              <CaseNetwork />
             </RoutedPage>
           </Protected>
         }

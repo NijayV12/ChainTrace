@@ -11,6 +11,12 @@ interface BlockSummary {
   data: {
     identityHash: string;
     accountId?: string;
+    entityType?: string;
+    entityId?: string;
+    evidenceType?: string;
+    summary?: string;
+    source?: string;
+    evidenceHash?: string;
   };
 }
 
@@ -78,12 +84,14 @@ export default function BlockchainExplorer() {
   const overview = useMemo(() => {
     const blocks = data?.blocks ?? [];
     const anchoredAccounts = blocks.filter((block) => block.data.accountId).length;
+    const evidenceRecords = blocks.filter((block) => block.data.evidenceType).length;
     const avgNonce =
       blocks.length > 0
         ? Math.round(blocks.reduce((sum, block) => sum + block.nonce, 0) / blocks.length)
         : 0;
     return {
       anchoredAccounts,
+      evidenceRecords,
       avgNonce,
       firstTimestamp: blocks[0]?.timestamp ?? null,
       latestTimestamp: blocks[blocks.length - 1]?.timestamp ?? null,
@@ -117,7 +125,7 @@ export default function BlockchainExplorer() {
         </div>
       )}
 
-      <section className="grid gap-4 md:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-5">
         <div className="rounded-[1.5rem] border border-slate-800 bg-slate-950/50 p-5">
           <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Blocks</p>
           <p className="mt-3 text-3xl font-semibold text-white">{loading ? "--" : data?.length ?? 0}</p>
@@ -134,6 +142,12 @@ export default function BlockchainExplorer() {
           <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Integrity</p>
           <p className={`mt-3 text-2xl font-semibold ${data?.valid ? "text-emerald-300" : "text-rose-300"}`}>
             {loading ? "--" : data?.valid ? "Valid" : "Invalid"}
+          </p>
+        </div>
+        <div className="rounded-[1.5rem] border border-slate-800 bg-slate-950/50 p-5">
+          <p className="text-[11px] uppercase tracking-[0.24em] text-slate-500">Evidence records</p>
+          <p className="mt-3 text-3xl font-semibold text-amber-300">
+            {loading ? "--" : overview.evidenceRecords}
           </p>
         </div>
       </section>
@@ -204,6 +218,9 @@ export default function BlockchainExplorer() {
                     </span>
                   </div>
                   <p className="mt-3 break-all text-xs text-slate-300">{shortHash(block.hash)}</p>
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    {block.data.evidenceType ?? "Identity anchor"} | {block.data.entityType ?? "ACCOUNT"}
+                  </p>
                 </button>
               ))
             )}
@@ -257,7 +274,31 @@ export default function BlockchainExplorer() {
                       {selectedBlock.data.accountId ?? "Genesis / no account reference"}
                     </p>
                   </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Evidence type</p>
+                    <p className="mt-2 break-all text-sm text-slate-200">
+                      {selectedBlock.data.evidenceType ?? "Identity anchor"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Entity type</p>
+                    <p className="mt-2 break-all text-sm text-slate-200">
+                      {selectedBlock.data.entityType ?? "ACCOUNT"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Entity reference</p>
+                    <p className="mt-2 break-all text-sm text-slate-200">
+                      {selectedBlock.data.entityId ?? selectedBlock.data.accountId ?? "n/a"}
+                    </p>
+                  </div>
                 </div>
+                {selectedBlock.data.summary ? (
+                  <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/45 p-4">
+                    <p className="text-xs text-slate-500">Evidence summary</p>
+                    <p className="mt-2 text-sm text-slate-200">{selectedBlock.data.summary}</p>
+                  </div>
+                ) : null}
               </div>
 
               <div className="rounded-[1.5rem] border border-slate-800 bg-slate-900/35 p-5">
